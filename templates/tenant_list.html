@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Tenants · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Tenants</h1>
+    <p>{{ tenants|length }} cliente{{ 's' if tenants|length != 1 else '' }} registrado{{ 's' if tenants|length != 1 else '' }}.</p>
+</hgroup>
+
+<div class="grid">
+    <form method="get" role="search">
+        <input type="search" name="q" value="{{ search }}"
+               placeholder="Buscar por slug o nombre...">
+    </form>
+    <div style="text-align: right;">
+        <a role="button" href="{{ url_for('tenants.nuevo') }}">+ Nuevo tenant</a>
+    </div>
+</div>
+
+{% if tenants %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Slug</th>
+            <th>Nombre</th>
+            <th>BD</th>
+            <th>Estado</th>
+            <th>Keys</th>
+            <th>Último sync</th>
+            <th>Alta</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tenants %}
+        <tr>
+            <td><code>{{ t.slug }}</code></td>
+            <td><strong>{{ t.nombre }}</strong></td>
+            <td><code>{{ t.db_name or '—' }}</code></td>
+            <td>
+                {% if t.estado == 'activo' %}
+                    <span class="badge badge-success">activo</span>
+                {% elif t.estado == 'suspendido' %}
+                    <span class="badge badge-warning">suspendido</span>
+                {% else %}
+                    <span class="badge badge-danger">{{ t.estado }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {{ t.active_keys }} <small class="muted">/ {{ t.total_keys }}</small>
+            </td>
+            <td>
+                {% if t.last_used_at %}
+                    <small>{{ t.last_used_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                {% else %}
+                    <small class="muted">nunca</small>
+                {% endif %}
+            </td>
+            <td><small>{{ t.created_at.strftime('%Y-%m-%d') }}</small></td>
+            <td>
+                <a href="{{ url_for('tenants.detail', tenant_id=t.id) }}"
+                   role="button" class="secondary outline">Ver</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<article>
+    {% if search %}
+    <p>No se encontraron tenants para <strong>"{{ search }}"</strong>.</p>
+    <a href="{{ url_for('tenants.lista') }}">Limpiar búsqueda</a>
+    {% else %}
+    <p><em>Todavía no hay tenants registrados.</em></p>
+    <a href="{{ url_for('tenants.nuevo') }}" role="button">Crear el primer tenant</a>
+    {% endif %}
+</article>
+{% endif %}
+{% endblock %}

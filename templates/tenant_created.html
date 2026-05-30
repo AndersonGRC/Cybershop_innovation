@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Tenant creado · CyberShop Admin{% endblock %}
+
+{% block content %}
+<article class="success-banner">
+    <hgroup>
+        <h1>✓ Tenant creado</h1>
+        <p><strong>{{ info.nombre }}</strong> ({{ info.slug }})</p>
+    </hgroup>
+</article>
+
+<article class="warning-banner">
+    <h2>⚠️ Copiá estas credenciales AHORA</h2>
+    <p>
+        La <strong>API key</strong> no se vuelve a mostrar nunca. Si la perdés,
+        tendrás que rotar la key (con el botón en el detalle del tenant) y dar
+        de baja la vieja.
+    </p>
+</article>
+
+<article>
+    <h3>Para entregar al cliente</h3>
+
+    <label>
+        Client code <small>(el cliente lo teclea en <code>/descargar</code>)</small>
+        <input type="text" readonly value="{{ info.client_code }}"
+               onclick="this.select()" style="font-family: monospace; font-size: 1.2em;">
+    </label>
+
+    <p>
+        <small>
+            Indicá al cliente que vaya a
+            <strong>https://cybershopcol.com/descargar</strong>
+            y pegue ese código. El portal genera su instalador personalizado
+            con la API key ya pre-llenada en el <code>bootstrap.json</code>.
+        </small>
+    </p>
+</article>
+
+<article>
+    <h3>Solo para tu registro interno</h3>
+
+    <label>
+        API key (X-Sync-Key)
+        <input type="text" readonly value="{{ info.api_key }}"
+               onclick="this.select()" style="font-family: monospace; font-size: 0.95em;">
+    </label>
+
+    <small>
+        El cliente no necesita esta key directamente — viene en su ZIP. Guardala
+        igual en tu password manager por si necesitás reemitirla o debuguear.
+    </small>
+
+    <hr>
+
+    <details>
+        <summary>Detalles técnicos del tenant</summary>
+        <table>
+            <tr><td><strong>Tenant ID</strong></td><td>{{ info.tenant_id }}</td></tr>
+            <tr><td><strong>Slug</strong></td><td><code>{{ info.slug }}</code></td></tr>
+            <tr><td><strong>Nombre</strong></td><td>{{ info.nombre }}</td></tr>
+            <tr><td><strong>DB name</strong></td><td><code>{{ info.db_name }}</code></td></tr>
+            <tr><td><strong>Key ID</strong></td><td>{{ info.key_id }}</td></tr>
+            <tr><td><strong>Key prefix</strong></td><td><code>{{ info.key_prefix }}</code>…</td></tr>
+        </table>
+    </details>
+</article>
+
+<div class="grid">
+    <a role="button" class="secondary" href="{{ url_for('tenants.lista') }}">Volver a la lista</a>
+    <a role="button" href="{{ url_for('tenants.detail', tenant_id=info.tenant_id) }}">Ver detalle del tenant</a>
+</div>
+{% endblock %}

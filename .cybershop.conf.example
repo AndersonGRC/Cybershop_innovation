@@ -1,0 +1,52 @@
+# ============================================================
+# CyberShopAdmin — configuración
+# Copia este archivo a `.cybershop.conf` y llena los valores reales.
+# NUNCA commitees `.cybershop.conf` al repo.
+# ============================================================
+
+# --- Flask ---
+# Generar con: python -c "import secrets; print(secrets.token_hex(32))"
+FLASK_SECRET_KEY=cambiar-por-uno-aleatorio-de-32-bytes-hex
+
+# Activar HTTPS-only cookies en producción (true) o dev local HTTP (false)
+SESSION_COOKIE_SECURE=false
+
+# Puerto del servicio (default 5002)
+PORT=5002
+
+# --- Postgres: control plane ---
+# Misma BD que usa CyberShop (saas_control_plane)
+CONTROL_PLANE_DB_NAME=saas_control_plane
+CONTROL_PLANE_DB_HOST=localhost
+CONTROL_PLANE_DB_PORT=5432
+CONTROL_PLANE_DB_USER=postgres
+CONTROL_PLANE_DB_PASSWORD=tu-postgres-password
+
+# --- Postgres: para CREATE DATABASE de tenants nuevos ---
+# Necesita usuario con privilegio CREATEDB (típicamente postgres superuser).
+# Las credenciales aquí también se usan para conectarse a los nuevos cyber_tNNN
+# después de crearlos (mismo usuario para todos los tenants).
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=tu-postgres-password
+
+# --- Cifrado de credenciales por tenant ---
+# DEBE ser el MISMO KMS_KEY que usa CyberShop (../CyberShop/app/.cybershop.conf)
+# para que ambos puedan cifrar/descifrar tenant_databases.db_password_enc.
+# Generar (si todavía no existe): python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+KMS_KEY=base64-key-de-32-bytes-igual-que-cybershop
+
+# --- Schema base para tenants nuevos ---
+# Ruta absoluta o relativa al .sql que define el esquema inicial de cada
+# nueva DB de cliente (productos, usuarios, pedidos, etc.).
+# Dev local Windows:
+TENANT_SCHEMA_FILE=..\CyberShop\app\migrate_backup_db.sql
+# Producción VPS (Linux):
+# TENANT_SCHEMA_FILE=/var/www/CyberShop/app/migrate_backup_db.sql
+
+# --- psql binario (para aplicar schema a tenants nuevos) ---
+# Dev local Windows (ajustá la versión de Postgres):
+PSQL_BIN=C:\Program Files\PostgreSQL\17\bin\psql.exe
+# Producción VPS:
+# PSQL_BIN=/usr/bin/psql

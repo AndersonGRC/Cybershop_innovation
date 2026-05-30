@@ -1,0 +1,163 @@
+/* CyberShopAdmin — overrides mínimos sobre Pico.css */
+
+:root {
+    --pico-primary:        #122C94;
+    --pico-primary-hover:  #091C5A;
+    --pico-primary-focus:  rgba(18, 44, 148, 0.25);
+    --pico-form-element-active-border-color: var(--pico-primary);
+}
+
+/* Navbar */
+.admin-nav {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.5rem 2rem;
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.admin-nav ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+}
+.admin-nav a.brand {
+    color: var(--pico-primary);
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+.admin-nav a {
+    text-decoration: none;
+    color: #374151;
+}
+.admin-nav a:hover {
+    color: var(--pico-primary);
+}
+
+/* Flash messages */
+.flash {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+.flash-success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+.flash-error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+}
+.flash-warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+.flash-info {
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+}
+
+/* Dashboard stats grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem;
+}
+.stat-card {
+    text-align: center;
+    padding: 1rem;
+    margin: 0;
+}
+.stat-card h2 {
+    margin: 0.5rem 0;
+    font-size: 2.2rem;
+    color: var(--pico-primary);
+}
+.stat-card small {
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.stat-card .muted {
+    color: #9ca3af;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.badge-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.badge-warning { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+.badge-danger  { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+.badge-muted   { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+
+/* Login card */
+.login-card {
+    max-width: 420px;
+    margin: 4rem auto;
+}
+.login-card hgroup {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+/* Created banner */
+.success-banner {
+    background: #ecfdf5;
+    border-left: 4px solid #10b981;
+}
+.warning-banner {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+}
+
+/* Tables */
+.muted { color: #9ca3af; }
+code {
+    background: #f3f4f6;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* Key action buttons (inline en tabla) */
+.key-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.btn-small {
+    padding: 0.3rem 0.7rem !important;
+    font-size: 0.85rem !important;
+    margin: 0 !important;
+}
+
+/* Forms inline en cards */
+form .grid {
+    align-items: end;
+}
+
+/* Detail page */
+.dropdown summary {
+    cursor: pointer;
+}

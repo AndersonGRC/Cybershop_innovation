@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CyberShop Admin{% endblock %}</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+</head>
+<body>
+    {% if admin %}
+    <nav class="admin-nav">
+        <ul>
+            <li><strong><a href="{{ url_for('dashboard.index') }}" class="brand">CyberShop Admin</a></strong></li>
+        </ul>
+        <ul>
+            <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+            <li><a href="{{ url_for('tenants.lista') }}">Tenants</a></li>
+            <li>
+                <details class="dropdown">
+                    <summary>{{ admin.nombre }}</summary>
+                    <ul dir="rtl">
+                        <li><small>{{ admin.email }}</small></li>
+                        <li><a href="{{ url_for('auth.logout') }}">Cerrar sesión</a></li>
+                    </ul>
+                </details>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <article class="flash flash-{{ category }}">{{ message }}</article>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="container">
+        <small>CyberShop Admin · panel SaaS</small>
+    </footer>
+</body>
+</html>

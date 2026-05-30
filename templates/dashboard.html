@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Dashboard</h1>
+    <p>Vista general del SaaS.</p>
+</hgroup>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <small>Tenants activos</small>
+        <h2>{{ stats.tenants_activos }}</h2>
+        <small class="muted">de {{ stats.tenants_total }} totales</small>
+    </article>
+
+    <article class="stat-card">
+        <small>Tenants suspendidos</small>
+        <h2>{{ stats.tenants_suspendidos }}</h2>
+    </article>
+
+    <article class="stat-card">
+        <small>API keys activas</small>
+        <h2>{{ stats.keys_activas }}</h2>
+        <small class="muted">de {{ stats.keys_total }} totales</small>
+    </article>
+
+    <article class="stat-card">
+        <small>Último sync registrado</small>
+        <h2>
+            {% if stats.ultimo_sync %}
+                {{ stats.ultimo_sync.strftime('%H:%M') }}
+            {% else %}
+                —
+            {% endif %}
+        </h2>
+        {% if stats.ultimo_sync %}
+        <small class="muted">{{ stats.ultimo_sync.strftime('%Y-%m-%d') }}</small>
+        {% endif %}
+    </article>
+</section>
+
+<section>
+    <header>
+        <h2>Actividad reciente</h2>
+        <p><small>Últimos 10 desktops que sincronizaron.</small></p>
+    </header>
+
+    {% if stats.actividad %}
+    <figure>
+    <table>
+        <thead>
+            <tr>
+                <th>Tenant</th>
+                <th>Client code</th>
+                <th>Key prefix</th>
+                <th>Último uso</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in stats.actividad %}
+            <tr>
+                <td>
+                    <strong>{{ row.nombre }}</strong><br>
+                    <small class="muted">{{ row.slug }}</small>
+                </td>
+                <td><code>{{ row.client_code }}</code></td>
+                <td><code>{{ row.key_prefix }}</code>…</td>
+                <td>{{ row.last_used_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </figure>
+    {% else %}
+    <p><em>Aún no hay actividad registrada.</em></p>
+    {% endif %}
+</section>
+
+<section>
+    <a role="button" href="{{ url_for('tenants.nuevo') }}">+ Crear tenant nuevo</a>
+    <a role="button" class="secondary" href="{{ url_for('tenants.lista') }}">Ver todos los tenants</a>
+</section>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo tenant · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Crear tenant nuevo</h1>
+    <p>Esto provisiona un cliente nuevo end-to-end: crea su base de datos, aplica el schema base, registra en el control plane y emite la primera API key.</p>
+</hgroup>
+
+<article>
+    <form method="post">
+        <label for="slug">
+            Slug del tenant
+            <input type="text" id="slug" name="slug" required
+                   value="{{ form.slug }}"
+                   pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                   minlength="3" maxlength="40"
+                   placeholder="ej. panaderia-roma o cyber-t042">
+            <small>
+                Solo minúsculas, números y guiones. Es el identificador
+                permanente — no se puede cambiar después.
+            </small>
+        </label>
+
+        <label for="nombre">
+            Nombre legible
+            <input type="text" id="nombre" name="nombre" required
+                   value="{{ form.nombre }}" maxlength="100"
+                   placeholder="ej. Panadería Roma">
+            <small>El nombre que se muestra al admin (se puede cambiar después).</small>
+        </label>
+
+        <details>
+            <summary>¿Qué hace este botón exactamente?</summary>
+            <ol>
+                <li>Valida que el slug sea único.</li>
+                <li>Computa el nombre de BD (<code>cyber_tNNN</code>).</li>
+                <li><code>CREATE DATABASE cyber_tNNN</code> en Postgres.</li>
+                <li>Aplica el schema base (productos, usuarios, pedidos, etc.).</li>
+                <li>Inserta filas en <code>tenants</code> y <code>tenant_databases</code>.</li>
+                <li>Emite la primera API key + client code para el cliente.</li>
+            </ol>
+            <p><strong>Tarda 2-5 segundos.</strong> Al terminar te mostramos la API key UNA SOLA VEZ — copiala y guardala en lugar seguro.</p>
+        </details>
+
+        <div class="grid">
+            <a role="button" class="secondary" href="{{ url_for('tenants.lista') }}">Cancelar</a>
+            <button type="submit">Crear tenant</button>
+        </div>
+    </form>
+</article>
+{% endblock %}

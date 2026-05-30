@@ -1,0 +1,40 @@
+# systemd unit para CyberShopAdmin
+#
+# Instalar en el VPS:
+#   sudo cp deploy/cybershop-admin.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable cybershop-admin
+#   sudo systemctl start cybershop-admin
+#
+# Logs:
+#   sudo journalctl -u cybershop-admin -f
+#
+# Reiniciar tras cambios de codigo:
+#   sudo systemctl restart cybershop-admin
+
+[Unit]
+Description=CyberShopAdmin - Panel SaaS de administracion de tenants
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/CyberShopAdmin
+Environment="PATH=/var/www/CyberShopAdmin/venv/bin"
+ExecStart=/var/www/CyberShopAdmin/venv/bin/python /var/www/CyberShopAdmin/app.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cybershop-admin
+
+# Hardening basico
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

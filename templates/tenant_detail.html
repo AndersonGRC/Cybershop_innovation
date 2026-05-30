@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block title %}{{ tenant.nombre }} · CyberShop Admin{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{{ url_for('tenants.lista') }}">Tenants</a></li>
+        <li>{{ tenant.slug }}</li>
+    </ul>
+</nav>
+
+<hgroup>
+    <h1>{{ tenant.nombre }}</h1>
+    <p>
+        <code>{{ tenant.slug }}</code> ·
+        <code>{{ tenant.db_name or 'sin BD' }}</code> ·
+        {% if tenant.estado == 'activo' %}
+            <span class="badge badge-success">activo</span>
+        {% elif tenant.estado == 'suspendido' %}
+            <span class="badge badge-warning">suspendido</span>
+        {% else %}
+            <span class="badge badge-danger">{{ tenant.estado }}</span>
+        {% endif %}
+    </p>
+</hgroup>
+
+<section>
+    <h2>Acciones rápidas</h2>
+    <div class="grid">
+        <form method="post" action="{{ url_for('tenants.toggle', tenant_id=tenant.id) }}"
+              onsubmit="return confirm('{% if tenant.estado == 'activo' %}Suspender el tenant desactiva TODAS sus API keys, los desktops dejan de funcionar. ¿Continuar?{% else %}Reactivar el tenant. ¿Continuar?{% endif %}')">
+            <button type="submit" class="{% if tenant.estado == 'activo' %}secondary{% endif %}">
+                {% if tenant.estado == 'activo' %}Suspender tenant{% else %}Reactivar tenant{% endif %}
+            </button>
+        </form>
+
+        <form method="post" action="{{ url_for('tenants.key_nueva', tenant_id=tenant.id) }}">
+            <input type="text" name="label" placeholder="Etiqueta (ej. POS Tienda Norte)" required>
+            <button type="submit">+ Nueva API key</button>
+        </form>
+    </div>
+</section>
+
+<section>
+    <header>
+        <h2>API keys</h2>
+        <p><small>{{ keys|length }} key{{ 's' if keys|length != 1 else '' }} en total.</small></p>
+    </header>
+
+    {% if keys %}
+    <figure>
+    <table>
+        <thead>
+            <tr>
+                <th>Estado</th>
+                <th>Etiqueta</th>
+                <th>Client code</th>
+                <th>Key prefix</th>
+                <th>Creada</th>
+                <th>Último uso</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for k in keys %}
+            <tr>
+                <td>
+                    {% if k.active %}
+                        <span class="badge badge-success">activa</span>
+                    {% else %}
+                        <span class="badge badge-muted">inactiva</span>
+                    {% endif %}
+                </td>
+                <td>{{ k.label or '—' }}</td>
+                <td><code>{{ k.client_code }}</code></td>
+                <td><code>{{ k.key_prefix }}</code>…</td>
+                <td><small>{{ k.created_at.strftime('%Y-%m-%d') }}</small></td>
+                <td>
+                    {% if k.last_used_at %}
+                        <small>{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    {% else %}
+                        <small class="muted">nunca</small>
+                    {% endif %}
+                </td>
+                <td class="key-actions">
+                    {% if k.active %}
+                    <form method="post"
+                          action="{{ url_for('tenants.key_suspend', tenant_id=tenant.id, key_id=k.id) }}"
+                          onsubmit="return confirm('Desactivar esta key. El desktop que la usa dejará de funcionar. ¿Continuar?')">
+                        <button type="submit" class="secondary outline btn-small">Desactivar</button>
+                    </form>
+                    {% else %}
+                    <form method="post"
+                          action="{{ url_for('tenants.key_activate', tenant_id=tenant.id, key_id=k.id) }}">
+                        <button type="submit" class="secondary outline btn-small">Activar</button>
+                    </form>
+                    {% endif %}
+                    <form method="post"
+                          action="{{ url_for('tenants.key_rotate', tenant_id=tenant.id, key_id=k.id) }}"
+                          onsubmit="return confirm('Rotar: desactiva esta key y genera una nueva. El desktop necesitará re-instalarse o actualizar su config. ¿Continuar?')">
+                        <button type="submit" class="contrast outline btn-small">Rotar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </figure>
+    {% else %}
+    <p><em>Este tenant todavía no tiene API keys. Emití una con el botón de arriba.</em></p>
+    {% endif %}
+</section>
+
+<section>
+    <details>
+        <summary>Información técnica</summary>
+        <table>
+            <tr><td>Tenant ID</td><td>{{ tenant.id }}</td></tr>
+            <tr><td>Slug</td><td><code>{{ tenant.slug }}</code></td></tr>
+            <tr><td>Plan</td><td>{{ tenant.plan }}</td></tr>
+            <tr><td>BD</td><td><code>{{ tenant.db_name }}</code></td></tr>
+            <tr><td>BD host</td><td>{{ tenant.db_host }}:{{ tenant.db_port }}</td></tr>
+            <tr><td>Schema version</td><td>{{ tenant.schema_version }}</td></tr>
+            <tr><td>Alta</td><td>{{ tenant.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+            <tr><td>Último migrate</td>
+                <td>
+                    {% if tenant.last_migrated_at %}
+                        {{ tenant.last_migrated_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}—{% endif %}
+                </td></tr>
+        </table>
+    </details>
+</section>
+{% endblock %}

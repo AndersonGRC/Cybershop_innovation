@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Login · CyberShop Admin{% endblock %}
+
+{% block content %}
+<article class="login-card">
+    <hgroup>
+        <h1>CyberShop Admin</h1>
+        <p>Panel de administración SaaS</p>
+    </hgroup>
+
+    <form method="post">
+        {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+
+        <label for="email">
+            Email
+            <input type="email" id="email" name="email" required autofocus
+                   autocomplete="username" placeholder="admin@cybershop.local">
+        </label>
+
+        <label for="password">
+            Contraseña
+            <input type="password" id="password" name="password" required
+                   autocomplete="current-password">
+        </label>
+
+        <button type="submit">Entrar</button>
+    </form>
+
+    <footer>
+        <small>Solo personal autorizado. Accesos auditados.</small>
+    </footer>
+</article>
+{% endblock %}
