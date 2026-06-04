@@ -249,6 +249,22 @@
             <tr><td>Alta</td><td>{{ tenant.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
         </table>
     </article>
+
+    <article class="card danger-zone">
+        <h3>Zona de peligro</h3>
+        <p><small>Escribe el slug <code>{{ tenant.slug }}</code> para confirmar. <strong>Soft</strong> hace backup y conserva la BD (reversible). <strong>Hard</strong> hace backup y ELIMINA la BD (irreversible).</small></p>
+        <form method="post" action="{{ url_for('tenants.destroy', tenant_id=tenant.id) }}"
+              onsubmit="return confirm('¿Seguro? mode=' + this.mode.value);">
+            <div class="plan-row">
+                <input type="text" name="confirm_slug" placeholder="Escribe: {{ tenant.slug }}" required>
+                <select name="mode">
+                    <option value="soft">Cancelar + backup (conservar BD)</option>
+                    <option value="hard">Eliminar + backup (DROP BD)</option>
+                </select>
+                <button type="submit" class="contrast">Ejecutar</button>
+            </div>
+        </form>
+    </article>
 </section>
 
 <script>

@@ -24,3 +24,7 @@ Thumbs.db
 
 # Backups locales
 *.bak
+
+# Datos locales por instancia / backups (no commitear)
+instances/
+backups/

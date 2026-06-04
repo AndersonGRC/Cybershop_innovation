@@ -232,3 +232,7 @@ form .grid {
 /* Integraciones */
 .int-group > summary { font-weight: 700; color: var(--cs-primary-dark); cursor: pointer; padding: .2rem 0; }
 .int-group[open] > summary { margin-bottom: .8rem; }
+
+/* Zona de peligro */
+.danger-zone { border: 1px solid #f3c0c0; background: #fff7f7; }
+.danger-zone h3 { color: #b42318; }

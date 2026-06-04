@@ -166,16 +166,41 @@ def toggle(tenant_id):
     tenant = tenant_service.get_tenant(tenant_id)
     if not tenant:
         abort(404)
-    nuevo_estado = 'suspendido' if tenant['estado'] == 'activo' else 'activo'
-    tenant_service.set_estado(tenant_id, nuevo_estado)
-    if nuevo_estado == 'suspendido':
-        flash('Tenant suspendido. Todas sus API keys quedaron desactivadas.', 'success')
-    else:
-        flash(
-            'Tenant reactivado. Recordá activar manualmente las API keys que quieras volver a usar.',
-            'success'
-        )
-    return redirect(url_for('tenants.detail', tenant_id=tenant_id))
+    import lifecycle_service as lc
+    try:
+        if tenant['estado'] == 'activo':
+            lc.suspend(tenant_id)
+            flash('Cliente suspendido: instancia apagada (no permite ingreso) y API keys desactivadas.', 'success')
+        else:
+            lc.reactivate(tenant_id)
+            flash('Cliente reactivado. Revisá que la instancia esté arriba y reactivá las API keys necesarias.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error cambiando estado: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+
+
+@bp.route('/<int:tenant_id>/destroy', methods=['POST'])
+@login_required
+def destroy(tenant_id):
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    import lifecycle_service as lc
+    mode = (request.form.get('mode') or 'soft').strip()
+    confirm = (request.form.get('confirm_slug') or '').strip()
+    if confirm != tenant['slug']:
+        flash('Confirmación inválida: escribe el slug exacto del cliente.', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+    try:
+        if mode == 'hard':
+            backup = lc.destroy_hard(tenant_id)
+            flash(f'Cliente ELIMINADO (hard). Backup en {backup}. La BD fue borrada.', 'warning')
+        else:
+            backup = lc.destroy_soft(tenant_id)
+            flash(f'Cliente cancelado (soft). Backup en {backup}. La BD se conservó.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error destruyendo cliente: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
 
 
 # ── API keys del tenant ──────────────────────────────────────────
