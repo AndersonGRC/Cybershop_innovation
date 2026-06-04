@@ -50,3 +50,8 @@ TENANT_SCHEMA_FILE=..\CyberShop\app\migrate_backup_db.sql
 PSQL_BIN=C:\Program Files\PostgreSQL\17\bin\psql.exe
 # Producción VPS:
 # PSQL_BIN=/usr/bin/psql
+
+# --- PIN de acceso al panel maestro (numerico) ---
+# Si se define, el login es por PIN (sin email/password). Vacio = email/password.
+# En produccion: combinar con allow-list de IP en el proxy (ver DEPLOY.md).
+MASTER_PIN=1122

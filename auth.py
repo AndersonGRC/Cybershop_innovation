@@ -1,14 +1,64 @@
 """Autenticación de admin users."""
 
+import hmac
+import time
 from functools import wraps
 
 from flask import session, redirect, url_for, request, flash, g
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from config import Config
 from db import control_plane_cursor
 
 
 SESSION_KEY = 'admin_id'
+
+# Rate limiting simple del PIN (por IP, en memoria). El allow-list de IP del
+# proxy es la barrera real en producción; esto frena fuerza bruta básica.
+_PIN_MAX_FAILS = 5
+_PIN_LOCK_SECONDS = 600  # 10 min
+_pin_fails = {}  # ip -> [fails, lock_until_ts]
+
+
+def pin_locked(ip: str) -> int:
+    """Segundos restantes de bloqueo para esa IP (0 si no está bloqueada)."""
+    rec = _pin_fails.get(ip)
+    if rec and rec[1] > time.time():
+        return int(rec[1] - time.time())
+    return 0
+
+
+def _pin_record_fail(ip: str):
+    rec = _pin_fails.get(ip, [0, 0])
+    rec[0] += 1
+    if rec[0] >= _PIN_MAX_FAILS:
+        rec[1] = time.time() + _PIN_LOCK_SECONDS
+        rec[0] = 0
+    _pin_fails[ip] = rec
+
+
+def _pin_clear(ip: str):
+    _pin_fails.pop(ip, None)
+
+
+def pin_enabled() -> bool:
+    return bool((Config.MASTER_PIN or '').strip())
+
+
+def authenticate_pin(pin: str):
+    """Valida el PIN contra Config.MASTER_PIN (comparación constante) y devuelve
+    el admin super (o el primero activo). None si no coincide o no hay PIN."""
+    configured = (Config.MASTER_PIN or '').strip()
+    if not configured:
+        return None
+    if not pin or not hmac.compare_digest(str(pin).strip(), configured):
+        return None
+    with control_plane_cursor(dict_cursor=True) as cur:
+        cur.execute(
+            "SELECT id, email, nombre, is_super FROM admin_users "
+            "WHERE active = TRUE ORDER BY is_super DESC, id ASC LIMIT 1"
+        )
+        return cur.fetchone()
 
 
 def login_required(fn):

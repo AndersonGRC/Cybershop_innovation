@@ -1,35 +1,83 @@
 {% extends 'base.html' %}
-{% block title %}Login · CyberShop Admin{% endblock %}
+{% block title %}Acceso · CyberShop Admin{% endblock %}
 
 {% block content %}
 <article class="login-card">
-    <hgroup>
-        <h1>CyberShop Admin</h1>
-        <p>Panel de administración SaaS</p>
+    <hgroup style="text-align:center;">
+        <h1 style="color:#122C94;">CyberShop Master</h1>
+        <p>Panel de administración — acceso restringido</p>
     </hgroup>
 
+    {% if use_pin %}
+    <form method="post" id="pin-form" autocomplete="off">
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <input type="password" id="pin" name="pin" inputmode="numeric" pattern="[0-9]*"
+               class="pin-display" placeholder="••••" autofocus {% if locked %}disabled{% endif %}>
+
+        <div class="keypad">
+            {% for n in ['1','2','3','4','5','6','7','8','9'] %}
+            <button type="button" class="key" data-d="{{ n }}" {% if locked %}disabled{% endif %}>{{ n }}</button>
+            {% endfor %}
+            <button type="button" class="key key-aux" data-act="clear" {% if locked %}disabled{% endif %}>C</button>
+            <button type="button" class="key" data-d="0" {% if locked %}disabled{% endif %}>0</button>
+            <button type="button" class="key key-aux" data-act="back" {% if locked %}disabled{% endif %}>&#9003;</button>
+        </div>
+
+        <button type="submit" class="pin-enter" {% if locked %}disabled{% endif %}>Entrar</button>
+        {% if locked %}<p class="muted" style="text-align:center;">Bloqueado por intentos. Espera unos minutos.</p>{% endif %}
+    </form>
+    {% else %}
     <form method="post">
-        {% if next %}
-        <input type="hidden" name="next" value="{{ next }}">
-        {% endif %}
-
-        <label for="email">
-            Email
-            <input type="email" id="email" name="email" required autofocus
-                   autocomplete="username" placeholder="admin@cybershop.local">
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <label for="email">Email
+            <input type="email" id="email" name="email" required autofocus autocomplete="username">
         </label>
-
-        <label for="password">
-            Contraseña
-            <input type="password" id="password" name="password" required
-                   autocomplete="current-password">
+        <label for="password">Contraseña
+            <input type="password" id="password" name="password" required autocomplete="current-password">
         </label>
-
         <button type="submit">Entrar</button>
     </form>
+    {% endif %}
 
-    <footer>
-        <small>Solo personal autorizado. Accesos auditados.</small>
-    </footer>
+    <footer><small>Solo personal autorizado. Accesos auditados.</small></footer>
 </article>
+
+<style>
+    .login-card { max-width: 380px; margin: 5vh auto; }
+    .pin-display {
+        text-align: center; font-size: 2rem; letter-spacing: .6rem; font-family: ui-monospace, monospace;
+        margin-bottom: 1rem; border: 2px solid #d8deec; border-radius: 12px;
+    }
+    .pin-display:focus { border-color: #122C94; box-shadow: 0 0 0 3px rgba(18,44,148,.15); }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-bottom: 1rem; }
+    .key {
+        font-size: 1.4rem; font-weight: 700; padding: 1rem 0; margin: 0; border-radius: 12px;
+        background: #f6f8fc; color: #122C94; border: 1px solid #e5e9f2; cursor: pointer;
+        transition: background .12s, transform .06s;
+    }
+    .key:hover:not(:disabled) { background: #e9eefb; }
+    .key:active:not(:disabled) { transform: scale(.96); }
+    .key-aux { color: #5b6577; font-size: 1.1rem; }
+    .pin-enter { width: 100%; background: #122C94; }
+    .pin-enter:hover:not(:disabled) { background: #091C5A; }
+</style>
+
+<script>
+(function () {
+    var pin = document.getElementById('pin');
+    if (!pin) return;
+    document.querySelectorAll('.key').forEach(function (k) {
+        k.addEventListener('click', function () {
+            var act = k.dataset.act;
+            if (act === 'clear') pin.value = '';
+            else if (act === 'back') pin.value = pin.value.slice(0, -1);
+            else if (k.dataset.d) pin.value += k.dataset.d;
+            pin.focus();
+        });
+    });
+    pin.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('pin-form').submit();
+    });
+})();
+</script>
 {% endblock %}

@@ -38,6 +38,9 @@ class Config:
     # --- Cifrado AES-GCM ---
     KMS_KEY = os.getenv('KMS_KEY', '')
 
+    # --- PIN de acceso al panel maestro (numérico). Vacío = usar email/password ---
+    MASTER_PIN = os.getenv('MASTER_PIN', '')
+
     # --- Tenant provisioning ---
     # DB maestra (plantilla de estructura) de la que se genera el schema dump.
     MASTER_DB_NAME = os.getenv('MASTER_DB_NAME', 'cybershop')
