@@ -9,6 +9,7 @@ import tenant_service
 import api_key_service
 import client_config_service as ccs
 import module_service as ms
+import integrations_service as ints
 from tenant_service import TenantCreationError
 
 
@@ -88,12 +89,30 @@ def detail(tenant_id):
         except Exception as exc:  # noqa: BLE001
             site_error = str(exc)
 
+    # Integraciones (env por instancia; no requiere la BD del cliente)
+    integraciones = ints.get_integrations(tenant['slug'])
+
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
+        integraciones=integraciones,
         empresa_fields=ccs.EMPRESA_FIELDS, color_fields=ccs.COLOR_FIELDS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
     )
+
+
+@bp.route('/<int:tenant_id>/integraciones', methods=['POST'])
+@login_required
+def integraciones_save(tenant_id):
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    try:
+        ints.save_integrations(tenant['slug'], request.form)
+        flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error guardando integraciones: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
 
 
 @bp.route('/<int:tenant_id>/config', methods=['POST'])

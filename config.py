@@ -51,3 +51,10 @@ class Config:
         str(Path(__file__).parent / 'schema' / 'tenant_seed.sql'),
     )
     PSQL_BIN = os.getenv('PSQL_BIN', 'psql')
+
+    # --- EnvironmentFile por instancia (integraciones + runtime por cliente) ---
+    # Local dev: carpeta del repo. Producción: /etc/cybershop.
+    INSTANCE_ENV_DIR = os.getenv(
+        'INSTANCE_ENV_DIR',
+        str(Path(__file__).parent / 'instances'),
+    )

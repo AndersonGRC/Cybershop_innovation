@@ -228,3 +228,7 @@ form .grid {
 .plan-row { display: flex; gap: .6rem; align-items: center; margin: 0; }
 .plan-row select, .plan-row input { margin: 0; }
 .muted { color: #8a93a6; }
+
+/* Integraciones */
+.int-group > summary { font-weight: 700; color: var(--cs-primary-dark); cursor: pointer; padding: .2rem 0; }
+.int-group[open] > summary { margin-bottom: .8rem; }

@@ -40,6 +40,7 @@
     <button class="tab is-active" data-tab="config">Configuración</button>
     <button class="tab" data-tab="secciones">Secciones</button>
     <button class="tab" data-tab="modulos">Módulos</button>
+    <button class="tab" data-tab="integraciones">Integraciones</button>
     <button class="tab" data-tab="keys">API keys</button>
     <button class="tab" data-tab="tecnico">Técnico</button>
 </div>
@@ -144,6 +145,38 @@
     {% else %}
     <p><em>El cliente no tiene BD accesible.</em></p>
     {% endif %}
+</section>
+
+<!-- ===== Tab: Integraciones ===== -->
+<section class="tabpanel" id="tab-integraciones">
+    <article class="card">
+        <h3>Conexiones y credenciales de API</h3>
+        <p><small>Estas credenciales se guardan en el entorno de la instancia del cliente y se aplican al reiniciarla. Los secretos se muestran enmascarados: deja el campo en blanco para conservar el valor actual, o escribe uno nuevo para reemplazarlo.</small></p>
+    </article>
+    <form method="post" action="{{ url_for('tenants.integraciones_save', tenant_id=tenant.id) }}">
+        {% for grp in integraciones %}
+        <details class="card int-group" {% if loop.first %}open{% endif %}>
+            <summary>{{ grp.group }}</summary>
+            <div class="grid-2">
+                {% for f in grp.fields %}
+                <label>{{ f.label }}{% if f.secret %} <span class="muted">🔒</span>{% endif %}
+                    {% if f.type == 'select' %}
+                    <select name="{{ f.key }}">
+                        {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+                    </select>
+                    {% elif f.secret %}
+                    <input type="text" name="{{ f.key }}" value="" autocomplete="off"
+                           placeholder="{{ f.masked if f.has_value else '(no configurado)' }}">
+                    {% else %}
+                    <input type="text" name="{{ f.key }}" value="{{ f.value }}">
+                    {% endif %}
+                </label>
+                {% endfor %}
+            </div>
+        </details>
+        {% endfor %}
+        <button type="submit">Guardar integraciones</button>
+    </form>
 </section>
 
 <!-- ===== Tab: API keys ===== -->
