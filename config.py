@@ -39,8 +39,15 @@ class Config:
     KMS_KEY = os.getenv('KMS_KEY', '')
 
     # --- Tenant provisioning ---
+    # DB maestra (plantilla de estructura) de la que se genera el schema dump.
+    MASTER_DB_NAME = os.getenv('MASTER_DB_NAME', 'cybershop')
     TENANT_SCHEMA_FILE = os.getenv(
         'TENANT_SCHEMA_FILE',
-        str(Path(__file__).parent.parent / 'CyberShop' / 'app' / 'migrate_backup_db.sql'),
+        str(Path(__file__).parent / 'schema' / 'tenant_schema.sql'),
+    )
+    # Seed mínimo (roles, admin, colores, secciones) aplicado tras el schema.
+    TENANT_SEED_FILE = os.getenv(
+        'TENANT_SEED_FILE',
+        str(Path(__file__).parent / 'schema' / 'tenant_seed.sql'),
     )
     PSQL_BIN = os.getenv('PSQL_BIN', 'psql')

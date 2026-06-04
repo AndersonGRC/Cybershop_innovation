@@ -12,8 +12,9 @@ import psycopg2.sql as sql
 
 from config import Config
 from crypto import aes_gcm_encrypt
-from db import control_plane_cursor, get_postgres_admin_conn
+from db import control_plane_cursor, get_postgres_admin_conn, get_tenant_conn
 from api_key_service import issue_key
+import seed_service
 
 
 # slug válido: minúsculas, números, guiones; sin doble guión; 3-40 chars.
@@ -255,6 +256,18 @@ def _apply_schema(db_name: str):
         )
 
 
+def _apply_seed(db_name: str, nombre: str, admin_email: str) -> dict:
+    """Aplica el seed mínimo (roles, admin, colores, secciones) a la BD nueva.
+
+    Devuelve {'admin_email', 'admin_password'} (mostrar 1 vez).
+    """
+    conn = get_tenant_conn(db_name)
+    try:
+        return seed_service.apply_seed(conn, nombre=nombre, admin_email=admin_email)
+    finally:
+        conn.close()
+
+
 def _insert_tenant_rows(slug: str, nombre: str, db_name: str) -> int:
     """INSERT en tenants + tenant_databases. Devuelve tenant_id."""
     db_password_enc = aes_gcm_encrypt(Config.PG_PASSWORD)
@@ -285,7 +298,8 @@ def _insert_tenant_rows(slug: str, nombre: str, db_name: str) -> int:
     return tenant_id
 
 
-def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key') -> dict:
+def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
+                  admin_email: str = '') -> dict:
     """Orquesta la creación end-to-end de un tenant nuevo.
 
     Pasos:
@@ -294,11 +308,13 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key') -> dic
       3. Verificar que ni el slug ni la DB existan.
       4. CREATE DATABASE cyber_tNNN.
       5. Aplicar schema base con psql.
-      6. INSERT en tenants + tenant_databases.
-      7. Emitir primera API key + client_code.
+      6. Seed mínimo (roles, admin, colores, secciones).
+      7. INSERT en tenants + tenant_databases.
+      8. Emitir primera API key + client_code.
 
     Returns dict con todo lo necesario para mostrarle al admin:
-      {tenant_id, slug, db_name, api_key, client_code, key_prefix}
+      {tenant_id, slug, db_name, api_key, client_code, key_prefix,
+       admin_email, admin_password}
 
     Si algo falla, levanta TenantCreationError con mensaje específico.
     """
@@ -307,6 +323,7 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key') -> dic
         raise TenantCreationError("El nombre del tenant es obligatorio (max 100 chars).")
 
     slug = validate_slug(slug)
+    admin_email = (admin_email or '').strip().lower() or f'admin@{slug}.local'
 
     if _slug_exists(slug):
         raise TenantCreationError(f"Ya existe un tenant con slug '{slug}'.")
@@ -337,7 +354,16 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key') -> dic
             f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
         ) from exc
 
-    # Paso 6: registrar en control plane
+    # Paso 6: seed mínimo (roles, admin, colores, secciones)
+    try:
+        seed = _apply_seed(db_name, nombre, admin_email)
+    except Exception as exc:  # noqa: BLE001
+        raise TenantCreationError(
+            f"Seed inicial falló en {db_name}: {exc}\n"
+            f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
+        ) from exc
+
+    # Paso 7: registrar en control plane
     try:
         tenant_id = _insert_tenant_rows(slug, nombre, db_name)
     except Exception as exc:  # noqa: BLE001
@@ -356,12 +382,14 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key') -> dic
         ) from exc
 
     return {
-        'tenant_id':   tenant_id,
-        'slug':        slug,
-        'nombre':      nombre,
-        'db_name':     db_name,
-        'api_key':     key_info['api_key'],
-        'client_code': key_info['client_code'],
-        'key_prefix':  key_info['key_prefix'],
-        'key_id':      key_info['id'],
+        'tenant_id':      tenant_id,
+        'slug':           slug,
+        'nombre':         nombre,
+        'db_name':        db_name,
+        'api_key':        key_info['api_key'],
+        'client_code':    key_info['client_code'],
+        'key_prefix':     key_info['key_prefix'],
+        'key_id':         key_info['id'],
+        'admin_email':    seed['admin_email'],
+        'admin_password': seed['admin_password'],
     }
