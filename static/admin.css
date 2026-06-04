@@ -161,3 +161,70 @@ form .grid {
 .dropdown summary {
     cursor: pointer;
 }
+
+/* ============================================================
+   Detalle de tenant — tabs, cards, grids (paleta institucional)
+   ============================================================ */
+:root {
+    --cs-primary: #122C94;
+    --cs-primary-dark: #091C5A;
+    --cs-accent: #a6c438;
+    --cs-border: #e5e9f2;
+    --cs-bg-soft: #f6f8fc;
+}
+.tenant-head h1 { margin-bottom: .15rem; color: var(--cs-primary-dark); }
+.quick-actions { margin: .5rem 0 1.2rem; }
+.quick-actions form { margin: 0; }
+.quick-actions button { margin: 0; }
+
+/* Tab bar */
+.tabbar {
+    display: flex; flex-wrap: wrap; gap: .25rem;
+    border-bottom: 2px solid var(--cs-border); margin-bottom: 1.4rem;
+}
+.tabbar .tab {
+    background: transparent; border: none; color: #5b6577;
+    font-weight: 600; font-size: .95rem; padding: .7rem 1.1rem; margin: 0;
+    border-radius: 8px 8px 0 0; cursor: pointer; width: auto;
+    border-bottom: 3px solid transparent; transition: color .15s, border-color .15s, background .15s;
+}
+.tabbar .tab:hover { color: var(--cs-primary); background: var(--cs-bg-soft); }
+.tabbar .tab.is-active { color: var(--cs-primary); border-bottom-color: var(--cs-primary); }
+
+.tabpanel { display: none; animation: fadeIn .18s ease; }
+.tabpanel.is-active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Cards */
+.card {
+    background: #fff; border: 1px solid var(--cs-border); border-radius: 14px;
+    padding: 1.3rem 1.4rem; margin-bottom: 1.1rem; box-shadow: 0 4px 16px rgba(18,44,148,.05);
+}
+.card h3 { margin: 0 0 .3rem; color: var(--cs-primary-dark); font-size: 1.12rem; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; }
+.cat-title { margin: 1rem 0 .5rem; color: var(--cs-primary); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem 1.2rem; }
+@media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Colores */
+.color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .9rem; }
+.color-field { display: flex; flex-direction: column; gap: .3rem; }
+.color-label { font-size: .85rem; font-weight: 600; color: #44506a; }
+.color-row { display: flex; gap: .5rem; align-items: center; }
+.color-row input[type=color] { width: 46px; height: 38px; padding: 2px; border: 1px solid var(--cs-border); border-radius: 8px; cursor: pointer; }
+.color-hex { flex: 1; font-family: ui-monospace, monospace; text-transform: uppercase; margin: 0; }
+
+/* Toggles (secciones / módulos) */
+.toggle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .55rem .9rem; }
+.toggle-item {
+    display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem;
+    border: 1px solid var(--cs-border); border-radius: 10px; background: var(--cs-bg-soft);
+    font-size: .92rem; cursor: pointer; margin: 0;
+}
+.toggle-item input { margin: 0; }
+.toggle-item small.muted { color: #8a93a6; font-weight: 400; }
+
+.plan-row { display: flex; gap: .6rem; align-items: center; margin: 0; }
+.plan-row select, .plan-row input { margin: 0; }
+.muted { color: #8a93a6; }

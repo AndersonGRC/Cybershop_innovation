@@ -9,7 +9,7 @@
     </ul>
 </nav>
 
-<hgroup>
+<hgroup class="tenant-head">
     <h1>{{ tenant.nombre }}</h1>
     <p>
         <code>{{ tenant.slug }}</code> ·
@@ -21,99 +21,177 @@
         {% else %}
             <span class="badge badge-danger">{{ tenant.estado }}</span>
         {% endif %}
+        · plan <strong>{{ tenant.plan }}</strong>
     </p>
 </hgroup>
 
-<section>
-    <h2>Acciones rápidas</h2>
-    <div class="grid">
-        <form method="post" action="{{ url_for('tenants.toggle', tenant_id=tenant.id) }}"
-              onsubmit="return confirm('{% if tenant.estado == 'activo' %}Suspender el tenant desactiva TODAS sus API keys, los desktops dejan de funcionar. ¿Continuar?{% else %}Reactivar el tenant. ¿Continuar?{% endif %}')">
-            <button type="submit" class="{% if tenant.estado == 'activo' %}secondary{% endif %}">
-                {% if tenant.estado == 'activo' %}Suspender tenant{% else %}Reactivar tenant{% endif %}
-            </button>
-        </form>
-
-        <form method="post" action="{{ url_for('tenants.key_nueva', tenant_id=tenant.id) }}">
-            <input type="text" name="label" placeholder="Etiqueta (ej. POS Tienda Norte)" required>
-            <button type="submit">+ Nueva API key</button>
-        </form>
-    </div>
+<!-- Acciones rápidas -->
+<section class="quick-actions">
+    <form method="post" action="{{ url_for('tenants.toggle', tenant_id=tenant.id) }}"
+          onsubmit="return confirm('{% if tenant.estado == 'activo' %}Suspender el tenant desactiva TODAS sus API keys. ¿Continuar?{% else %}Reactivar el tenant. ¿Continuar?{% endif %}')">
+        <button type="submit" class="{% if tenant.estado == 'activo' %}secondary{% endif %}">
+            {% if tenant.estado == 'activo' %}⏸ Suspender{% else %}▶ Reactivar{% endif %}
+        </button>
+    </form>
 </section>
 
-<section>
-    <header>
-        <h2>API keys</h2>
-        <p><small>{{ keys|length }} key{{ 's' if keys|length != 1 else '' }} en total.</small></p>
-    </header>
+<!-- ===== Tabs ===== -->
+<div class="tabbar" role="tablist">
+    <button class="tab is-active" data-tab="config">Configuración</button>
+    <button class="tab" data-tab="secciones">Secciones</button>
+    <button class="tab" data-tab="modulos">Módulos</button>
+    <button class="tab" data-tab="keys">API keys</button>
+    <button class="tab" data-tab="tecnico">Técnico</button>
+</div>
 
-    {% if keys %}
-    <figure>
-    <table>
-        <thead>
-            <tr>
-                <th>Estado</th>
-                <th>Etiqueta</th>
-                <th>Client code</th>
-                <th>Key prefix</th>
-                <th>Creada</th>
-                <th>Último uso</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for k in keys %}
-            <tr>
-                <td>
-                    {% if k.active %}
-                        <span class="badge badge-success">activa</span>
-                    {% else %}
-                        <span class="badge badge-muted">inactiva</span>
-                    {% endif %}
-                </td>
-                <td>{{ k.label or '—' }}</td>
-                <td><code>{{ k.client_code }}</code></td>
-                <td><code>{{ k.key_prefix }}</code>…</td>
-                <td><small>{{ k.created_at.strftime('%Y-%m-%d') }}</small></td>
-                <td>
-                    {% if k.last_used_at %}
-                        <small>{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') }}</small>
-                    {% else %}
-                        <small class="muted">nunca</small>
-                    {% endif %}
-                </td>
-                <td class="key-actions">
-                    {% if k.active %}
-                    <form method="post"
-                          action="{{ url_for('tenants.key_suspend', tenant_id=tenant.id, key_id=k.id) }}"
-                          onsubmit="return confirm('Desactivar esta key. El desktop que la usa dejará de funcionar. ¿Continuar?')">
-                        <button type="submit" class="secondary outline btn-small">Desactivar</button>
-                    </form>
-                    {% else %}
-                    <form method="post"
-                          action="{{ url_for('tenants.key_activate', tenant_id=tenant.id, key_id=k.id) }}">
-                        <button type="submit" class="secondary outline btn-small">Activar</button>
-                    </form>
-                    {% endif %}
-                    <form method="post"
-                          action="{{ url_for('tenants.key_rotate', tenant_id=tenant.id, key_id=k.id) }}"
-                          onsubmit="return confirm('Rotar: desactiva esta key y genera una nueva. El desktop necesitará re-instalarse o actualizar su config. ¿Continuar?')">
-                        <button type="submit" class="contrast outline btn-small">Rotar</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </figure>
+{% if site_error %}
+<article class="flash flash-warning">No se pudo conectar a la BD del cliente: {{ site_error }}</article>
+{% endif %}
+
+<!-- ===== Tab: Configuración (empresa + colores) ===== -->
+<section class="tabpanel is-active" id="tab-config">
+    {% if cfg %}
+    <form method="post" action="{{ url_for('tenants.config_save', tenant_id=tenant.id) }}">
+        <article class="card">
+            <h3>Datos de la empresa</h3>
+            <div class="grid-2">
+                {% for key, label, tipo in empresa_fields %}
+                <label>{{ label }}
+                    <input type="text" name="{{ key }}" value="{{ cfg.empresa.get(key, '') }}">
+                </label>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="card">
+            <h3>Colores de marca</h3>
+            <p><small>El cliente también puede ajustarlos desde su panel. El admin del cliente no cambia de estructura, solo su sitio público.</small></p>
+            <div class="color-grid">
+                {% for key, label in color_fields %}
+                <div class="color-field">
+                    <span class="color-label">{{ label }}</span>
+                    <span class="color-row">
+                        <input type="color" name="{{ key }}" value="{{ cfg.colores.get(key, '') or '#122C94' }}">
+                        <input type="text" class="color-hex" value="{{ cfg.colores.get(key, '') }}"
+                               oninput="this.previousElementSibling.value=this.value" placeholder="#122C94">
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <button type="submit">Guardar configuración</button>
+    </form>
     {% else %}
-    <p><em>Este tenant todavía no tiene API keys. Emití una con el botón de arriba.</em></p>
+    <p><em>El cliente no tiene BD accesible para configurar.</em></p>
     {% endif %}
 </section>
 
-<section>
-    <details>
-        <summary>Información técnica</summary>
+<!-- ===== Tab: Secciones públicas ===== -->
+<section class="tabpanel" id="tab-secciones">
+    {% if secs %}
+    <form method="post" action="{{ url_for('tenants.secciones_save', tenant_id=tenant.id) }}">
+        <article class="card">
+            <h3>Secciones visibles del sitio público</h3>
+            <div class="toggle-grid">
+                {% for key, label in section_fields %}
+                <label class="toggle-item">
+                    <input type="checkbox" name="{{ key }}" role="switch" {% if secs.get(key) %}checked{% endif %}>
+                    {{ label }}
+                </label>
+                {% endfor %}
+            </div>
+        </article>
+        <button type="submit">Guardar secciones</button>
+    </form>
+    {% else %}
+    <p><em>El cliente no tiene BD accesible.</em></p>
+    {% endif %}
+</section>
+
+<!-- ===== Tab: Módulos ===== -->
+<section class="tabpanel" id="tab-modulos">
+    {% if mods %}
+    <article class="card">
+        <h3>Aplicar plan</h3>
+        <p><small>Activa los módulos típicos del plan. Luego puedes afinar uno a uno abajo.</small></p>
+        <form method="post" action="{{ url_for('tenants.modulos_save', tenant_id=tenant.id) }}" class="plan-row">
+            <select name="plan" required>
+                <option value="" disabled selected>Elegir plan…</option>
+                {% for p in plans %}<option value="{{ p }}">{{ p|capitalize }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="secondary">Aplicar plan</button>
+        </form>
+    </article>
+
+    <form method="post" action="{{ url_for('tenants.modulos_save', tenant_id=tenant.id) }}">
+        <article class="card">
+            <h3>Módulos activos del cliente</h3>
+            {% for cat, items in mods|groupby('categoria') %}
+            <h4 class="cat-title">{{ cat|capitalize }}</h4>
+            <div class="toggle-grid">
+                {% for m in items %}
+                <label class="toggle-item">
+                    <input type="checkbox" name="modulo" value="{{ m.code }}" role="switch" {% if m.is_active %}checked{% endif %}>
+                    <span>{{ m.nombre }}<br><small class="muted">{{ m.descripcion }}</small></span>
+                </label>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </article>
+        <button type="submit">Guardar módulos</button>
+    </form>
+    {% else %}
+    <p><em>El cliente no tiene BD accesible.</em></p>
+    {% endif %}
+</section>
+
+<!-- ===== Tab: API keys ===== -->
+<section class="tabpanel" id="tab-keys">
+    <article class="card">
+        <header class="card-head">
+            <h3>API keys <small class="muted">({{ keys|length }})</small></h3>
+            <form method="post" action="{{ url_for('tenants.key_nueva', tenant_id=tenant.id) }}" class="plan-row">
+                <input type="text" name="label" placeholder="Etiqueta (ej. POS Tienda Norte)" required>
+                <button type="submit">+ Nueva key</button>
+            </form>
+        </header>
+        {% if keys %}
+        <figure>
+        <table>
+            <thead><tr><th>Estado</th><th>Etiqueta</th><th>Client code</th><th>Prefix</th><th>Creada</th><th>Último uso</th><th>Acciones</th></tr></thead>
+            <tbody>
+                {% for k in keys %}
+                <tr>
+                    <td>{% if k.active %}<span class="badge badge-success">activa</span>{% else %}<span class="badge badge-muted">inactiva</span>{% endif %}</td>
+                    <td>{{ k.label or '—' }}</td>
+                    <td><code>{{ k.client_code }}</code></td>
+                    <td><code>{{ k.key_prefix }}</code>…</td>
+                    <td><small>{{ k.created_at.strftime('%Y-%m-%d') }}</small></td>
+                    <td>{% if k.last_used_at %}<small>{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') }}</small>{% else %}<small class="muted">nunca</small>{% endif %}</td>
+                    <td class="key-actions">
+                        {% if k.active %}
+                        <form method="post" action="{{ url_for('tenants.key_suspend', tenant_id=tenant.id, key_id=k.id) }}" onsubmit="return confirm('Desactivar esta key. ¿Continuar?')"><button type="submit" class="secondary outline btn-small">Desactivar</button></form>
+                        {% else %}
+                        <form method="post" action="{{ url_for('tenants.key_activate', tenant_id=tenant.id, key_id=k.id) }}"><button type="submit" class="secondary outline btn-small">Activar</button></form>
+                        {% endif %}
+                        <form method="post" action="{{ url_for('tenants.key_rotate', tenant_id=tenant.id, key_id=k.id) }}" onsubmit="return confirm('Rotar genera una nueva key. ¿Continuar?')"><button type="submit" class="contrast outline btn-small">Rotar</button></form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </figure>
+        {% else %}
+        <p><em>Sin API keys todavía.</em></p>
+        {% endif %}
+    </article>
+</section>
+
+<!-- ===== Tab: Técnico ===== -->
+<section class="tabpanel" id="tab-tecnico">
+    <article class="card">
+        <h3>Información técnica</h3>
         <table>
             <tr><td>Tenant ID</td><td>{{ tenant.id }}</td></tr>
             <tr><td>Slug</td><td><code>{{ tenant.slug }}</code></td></tr>
@@ -122,13 +200,22 @@
             <tr><td>BD host</td><td>{{ tenant.db_host }}:{{ tenant.db_port }}</td></tr>
             <tr><td>Schema version</td><td>{{ tenant.schema_version }}</td></tr>
             <tr><td>Alta</td><td>{{ tenant.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
-            <tr><td>Último migrate</td>
-                <td>
-                    {% if tenant.last_migrated_at %}
-                        {{ tenant.last_migrated_at.strftime('%Y-%m-%d %H:%M') }}
-                    {% else %}—{% endif %}
-                </td></tr>
         </table>
-    </details>
+    </article>
 </section>
+
+<script>
+(function () {
+    var tabs = document.querySelectorAll('.tab');
+    var panels = document.querySelectorAll('.tabpanel');
+    function show(name) {
+        tabs.forEach(function (t) { t.classList.toggle('is-active', t.dataset.tab === name); });
+        panels.forEach(function (p) { p.classList.toggle('is-active', p.id === 'tab-' + name); });
+        if (history.replaceState) history.replaceState(null, '', '#' + name);
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+    var h = (location.hash || '').replace('#', '');
+    if (h && document.getElementById('tab-' + h)) show(h);
+})();
+</script>
 {% endblock %}

@@ -7,6 +7,8 @@ from flask import (
 from auth import login_required
 import tenant_service
 import api_key_service
+import client_config_service as ccs
+import module_service as ms
 from tenant_service import TenantCreationError
 
 
@@ -74,7 +76,62 @@ def detail(tenant_id):
     if not tenant:
         abort(404)
     keys = api_key_service.list_keys(tenant_id)
-    return render_template('tenant_detail.html', tenant=tenant, keys=keys)
+
+    # Config/secciones/módulos del cliente (requiere su BD)
+    cfg = secs = mods = None
+    site_error = None
+    if tenant.get('db_name'):
+        try:
+            cfg = ccs.get_config(tenant_id)
+            secs = ccs.get_sections(tenant_id)
+            mods = ms.get_modules(tenant_id)
+        except Exception as exc:  # noqa: BLE001
+            site_error = str(exc)
+
+    return render_template(
+        'tenant_detail.html', tenant=tenant, keys=keys,
+        cfg=cfg, secs=secs, mods=mods, site_error=site_error,
+        empresa_fields=ccs.EMPRESA_FIELDS, color_fields=ccs.COLOR_FIELDS,
+        section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
+    )
+
+
+@bp.route('/<int:tenant_id>/config', methods=['POST'])
+@login_required
+def config_save(tenant_id):
+    try:
+        ccs.save_config(tenant_id, request.form)
+        flash('Configuración del sitio actualizada.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error guardando configuración: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
+
+
+@bp.route('/<int:tenant_id>/secciones', methods=['POST'])
+@login_required
+def secciones_save(tenant_id):
+    try:
+        ccs.save_sections(tenant_id, request.form)
+        flash('Secciones del sitio actualizadas.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error guardando secciones: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#secciones')
+
+
+@bp.route('/<int:tenant_id>/modulos', methods=['POST'])
+@login_required
+def modulos_save(tenant_id):
+    try:
+        plan = (request.form.get('plan') or '').strip()
+        if plan:
+            ms.apply_plan(tenant_id, plan)
+            flash(f"Plan '{plan}' aplicado a los módulos del cliente.", 'success')
+        else:
+            ms.save_modules(tenant_id, request.form.getlist('modulo'))
+            flash('Módulos del cliente actualizados.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error guardando módulos: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#modulos')
 
 
 @bp.route('/<int:tenant_id>/toggle', methods=['POST'])
