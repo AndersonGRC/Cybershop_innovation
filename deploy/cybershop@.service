@@ -1,0 +1,30 @@
+# Plantilla systemd para una instancia de CyberShop por cliente.
+# Uso: systemctl enable --now cybershop@<slug>
+# Lee /etc/cybershop/<slug>.env (PORT, DB_NAME, DEFAULT_TENANT_*, FLASK_SECRET_KEY,
+# integraciones...). El código es COMPARTIDO en APP_DIR; el env diferencia al cliente
+# y SOBREESCRIBE el .cybershop.conf compartido (load_dotenv override=False).
+#
+# Copiar a /etc/systemd/system/cybershop@.service y ajustar APP_DIR/usuario.
+
+[Unit]
+Description=CyberShop instancia (%i)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=cybershop
+Group=cybershop
+WorkingDirectory=/var/www/CyberShop/app
+EnvironmentFile=/etc/cybershop/%i.env
+ExecStart=/var/www/CyberShop/app/env/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:${PORT} \
+    --timeout 120 \
+    app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

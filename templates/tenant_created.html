@@ -19,6 +19,27 @@
 </article>
 
 <article>
+    <h3>Acceso del cliente a su panel</h3>
+    {% if info.domain %}
+    <label>
+        URL del sitio
+        <input type="text" readonly value="https://{{ info.domain }}" onclick="this.select()" style="font-family: monospace;">
+    </label>
+    {% endif %}
+    <div class="grid">
+        <label>
+            Usuario admin (entra en <code>/login</code>)
+            <input type="text" readonly value="{{ info.admin_email }}" onclick="this.select()" style="font-family: monospace;">
+        </label>
+        <label>
+            Contraseña temporal
+            <input type="text" readonly value="{{ info.admin_password }}" onclick="this.select()" style="font-family: monospace; font-size: 1.1em;">
+        </label>
+    </div>
+    <small>El cliente debe cambiar esta contraseña al primer ingreso. {% if info.instance_status == 'pending' %}<strong>Instancia: pendiente de arranque</strong> (se levanta al provisionar en el servidor).{% endif %}</small>
+</article>
+
+<article>
     <h3>Para entregar al cliente</h3>
 
     <label>
@@ -60,6 +81,8 @@
             <tr><td><strong>Slug</strong></td><td><code>{{ info.slug }}</code></td></tr>
             <tr><td><strong>Nombre</strong></td><td>{{ info.nombre }}</td></tr>
             <tr><td><strong>DB name</strong></td><td><code>{{ info.db_name }}</code></td></tr>
+            <tr><td><strong>Dominio</strong></td><td><code>{{ info.domain or '—' }}</code></td></tr>
+            <tr><td><strong>Puerto</strong></td><td>{{ info.port or '—' }}</td></tr>
             <tr><td><strong>Key ID</strong></td><td>{{ info.key_id }}</td></tr>
             <tr><td><strong>Key prefix</strong></td><td><code>{{ info.key_prefix }}</code>…</td></tr>
         </table>

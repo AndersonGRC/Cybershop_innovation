@@ -224,6 +224,20 @@
 <!-- ===== Tab: Técnico ===== -->
 <section class="tabpanel" id="tab-tecnico">
     <article class="card">
+        <h3>Instancia y dominio</h3>
+        {% if runtime %}
+        <table>
+            <tr><td>Dominio</td><td><code>https://{{ runtime.subdomain }}.cybershopcol.com</code></td></tr>
+            {% if runtime.custom_domain %}<tr><td>Dominio propio</td><td><code>{{ runtime.custom_domain }}</code></td></tr>{% endif %}
+            <tr><td>Puerto</td><td>{{ runtime.port }}</td></tr>
+            <tr><td>Estado instancia</td><td><span class="badge {{ 'badge-success' if runtime.instance_status=='running' else 'badge-warning' }}">{{ runtime.instance_status }}</span></td></tr>
+        </table>
+        {% else %}
+        <p><em>Sin runtime aprovisionado todavía.</em></p>
+        {% endif %}
+    </article>
+
+    <article class="card">
         <h3>Información técnica</h3>
         <table>
             <tr><td>Tenant ID</td><td>{{ tenant.id }}</td></tr>

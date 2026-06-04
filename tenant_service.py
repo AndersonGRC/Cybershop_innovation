@@ -15,6 +15,7 @@ from crypto import aes_gcm_encrypt
 from db import control_plane_cursor, get_postgres_admin_conn, get_tenant_conn
 from api_key_service import issue_key
 import seed_service
+import provisioning_service
 
 
 # slug válido: minúsculas, números, guiones; sin doble guión; 3-40 chars.
@@ -381,6 +382,14 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
             f"Podés emitirla manualmente desde el detalle del tenant."
         ) from exc
 
+    # Paso 9: aprovisionar instancia + dominio (puerto, env, runtime; service/Caddy en Linux)
+    prov = {'port': None, 'domain': None, 'instance_status': 'pending'}
+    try:
+        prov = provisioning_service.provision(tenant_id, slug, db_name, subdomain=slug)
+    except Exception as exc:  # noqa: BLE001
+        # No abortamos: el tenant ya existe; se puede reaprovisionar desde el detalle.
+        prov['error'] = str(exc)
+
     return {
         'tenant_id':      tenant_id,
         'slug':           slug,
@@ -392,4 +401,7 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
         'key_id':         key_info['id'],
         'admin_email':    seed['admin_email'],
         'admin_password': seed['admin_password'],
+        'port':           prov.get('port'),
+        'domain':         prov.get('domain'),
+        'instance_status': prov.get('instance_status'),
     }

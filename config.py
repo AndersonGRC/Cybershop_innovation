@@ -58,3 +58,11 @@ class Config:
         'INSTANCE_ENV_DIR',
         str(Path(__file__).parent / 'instances'),
     )
+
+    # --- Aprovisionamiento de instancia + dominio (1C) ---
+    BASE_DOMAIN = os.getenv('BASE_DOMAIN', 'cybershopcol.com')   # subdominios *.BASE_DOMAIN
+    APP_DIR = os.getenv('APP_DIR', '/var/www/CyberShop')          # código compartido (prod)
+    CADDY_SITES_DIR = os.getenv('CADDY_SITES_DIR', '/etc/caddy/sites')
+    PORT_MIN = int(os.getenv('PORT_MIN', '8100'))
+    PORT_MAX = int(os.getenv('PORT_MAX', '8999'))
+    BACKUP_DIR = os.getenv('BACKUP_DIR', '/var/backups/cybershop')

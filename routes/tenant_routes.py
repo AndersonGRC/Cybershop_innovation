@@ -92,10 +92,17 @@ def detail(tenant_id):
     # Integraciones (env por instancia; no requiere la BD del cliente)
     integraciones = ints.get_integrations(tenant['slug'])
 
+    # Runtime (puerto, dominio, estado de instancia)
+    try:
+        import provisioning_service as prov
+        runtime = prov.get_runtime(tenant_id)
+    except Exception:  # noqa: BLE001
+        runtime = None
+
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
-        integraciones=integraciones,
+        integraciones=integraciones, runtime=runtime,
         empresa_fields=ccs.EMPRESA_FIELDS, color_fields=ccs.COLOR_FIELDS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
     )
