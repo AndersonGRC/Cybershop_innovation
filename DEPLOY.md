@@ -235,3 +235,84 @@ Si no aparece, correr `seed_admin.py`. Si aparece con `active=false`:
 ```bash
 sudo -u postgres psql saas_control_plane -c "UPDATE admin_users SET active=TRUE WHERE email='tu@email.com';"
 ```
+
+---
+
+# Entorno multi-cliente (serving de clientes + actualizaciones)
+
+> Esto es lo que convierte al maestro en "desplegar un entorno total":
+> levantar la infra que sirve a CADA cliente y actualizar a los existentes
+> **sin afectar lo ya creado** (todo aditivo e idempotente).
+
+## A. Config extra del maestro (`.cybershop.conf`)
+
+```ini
+# Plantilla de estructura para clientes nuevos (regenerar en el server, ver C)
+TENANT_SCHEMA_FILE=/var/www/CyberShopAdmin/schema/tenant_schema.sql
+MASTER_DB_NAME=cybershop
+
+# EnvironmentFiles por instancia + dominios + backups
+INSTANCE_ENV_DIR=/etc/cybershop
+CADDY_SITES_DIR=/etc/caddy/sites
+BASE_DOMAIN=cybershopcol.com
+APP_DIR=/var/www/CyberShop            # código COMPARTIDO de CyberShop
+BACKUP_DIR=/var/backups/cybershop
+PORT_MIN=8100
+PORT_MAX=8999
+```
+
+## B. Infra de serving (una sola vez en el servidor)
+
+1. **Código compartido + venv del app** ya en `/var/www/CyberShop` (con `app/env/`).
+2. **Generar el schema real** de los clientes nuevos:
+   ```bash
+   sudo -u www-data venv/bin/python tools/refresh_tenant_schema.py   # -> schema/tenant_schema.sql
+   ```
+3. **Unit templada por cliente**:
+   ```bash
+   sudo cp deploy/cybershop@.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo mkdir -p /etc/cybershop                 # EnvironmentFiles
+   sudo mkdir -p /var/backups/cybershop
+   ```
+4. **Caddy** (reverse proxy + TLS de cada cliente). Caddyfile:
+   ```
+   # Wildcard de subdominios (requiere token DNS del proveedor para DNS-01)
+   *.cybershopcol.com {
+       tls { dns <proveedor> <token> }
+       # el bloque concreto por cliente lo escribe el maestro en /etc/caddy/sites
+   }
+   import /etc/caddy/sites/*.caddy
+   ```
+   ```bash
+   sudo mkdir -p /etc/caddy/sites && sudo systemctl reload caddy
+   ```
+   - Subdominios: instantáneos con el wildcard. Dominios propios: Caddy emite el cert al vincularlos (on-demand TLS).
+5. **sudoers acotado** para el usuario del maestro (least privilege): `systemctl (start|stop|restart|enable) cybershop@*`, `systemctl reload caddy`, `createdb`/`dropdb`/`pg_dump`/`psql`, y escribir en `/etc/cybershop/*` y `/etc/caddy/sites/*`.
+
+Con esto, **crear un cliente desde el panel** ya levanta su BD + instancia + dominio.
+
+## C. Flujo de ACTUALIZACIÓN (sin afectar lo existente)
+
+### Actualizar el código del app (todos los clientes a la vez)
+```bash
+cd /var/www/CyberShop && sudo -u www-data git pull
+# Si el cambio agrega tablas/columnas, escribir la migración aditiva en
+# CyberShopAdmin/migrations/tenant/000X_*.sql (CREATE/ALTER ... IF NOT EXISTS) y:
+sudo -u www-data /var/www/CyberShopAdmin/venv/bin/python /var/www/CyberShopAdmin/tools/migrate_tenants.py
+# Reiniciar TODAS las instancias (aplica el código nuevo):
+sudo /var/www/CyberShopAdmin/venv/bin/python /var/www/CyberShopAdmin/tools/manage_instances.py restart
+```
+
+### Actualizar el maestro
+```bash
+cd /var/www/CyberShopAdmin && sudo -u www-data git pull
+sudo -u www-data venv/bin/python tools/apply_migrations.py      # migraciones del control plane
+sudo systemctl restart cybershop-admin
+```
+
+### Reglas de oro
+- **Migraciones de tenant SOLO aditivas e idempotentes** (`IF NOT EXISTS`). Nunca DROP/ALTER destructivo. Ver `migrations/tenant/README.md`.
+- `migrate_tenants.py` es seguro de re-correr: salta lo ya aplicado por cliente.
+- Clientes **nuevos** ya traen todo por el dump; se marcan migraciones como aplicadas al crearse.
+- Tras tocar el schema del maestro: `refresh_tenant_schema.py` (para los nuevos) **+** una migración de tenant aditiva (para los existentes).

@@ -179,6 +179,33 @@ def toggle(tenant_id):
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
 
 
+@bp.route('/<int:tenant_id>/instancia', methods=['POST'])
+@login_required
+def instancia_accion(tenant_id):
+    """Acciones sobre la instancia/BD del cliente: reiniciar, migrar BD, reaprovisionar."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    accion = (request.form.get('accion') or '').strip()
+    try:
+        import provisioning_service as prov
+        if accion == 'restart':
+            prov.restart_service(tenant['slug'])
+            flash('Instancia reiniciada (en el servidor). En dev no aplica.', 'success')
+        elif accion == 'reprovision':
+            r = prov.provision(tenant_id, tenant['slug'], tenant['db_name'], subdomain=tenant['slug'])
+            flash(f"Reaprovisionado: puerto {r['port']}, dominio {r['domain']}.", 'success')
+        elif accion == 'migrate':
+            import tenant_migrations as tm
+            applied = tm.migrate_db(tenant['db_name'])
+            flash(f"Migración de BD: {len(applied)} aplicada(s)." if applied else "BD al día (nada que migrar).", 'success')
+        else:
+            flash('Acción no reconocida.', 'warning')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error en la acción de instancia: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+
+
 @bp.route('/<int:tenant_id>/destroy', methods=['POST'])
 @login_required
 def destroy(tenant_id):

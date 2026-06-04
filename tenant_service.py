@@ -258,13 +258,18 @@ def _apply_schema(db_name: str):
 
 
 def _apply_seed(db_name: str, nombre: str, admin_email: str) -> dict:
-    """Aplica el seed mínimo (roles, admin, colores, secciones) a la BD nueva.
+    """Aplica el seed mínimo (roles, admin, colores, secciones) a la BD nueva
+    y marca las migraciones de tenant actuales como aplicadas (el dump ya las
+    incluye), para que `migrate_tenants` solo corra las futuras.
 
     Devuelve {'admin_email', 'admin_password'} (mostrar 1 vez).
     """
+    import tenant_migrations
     conn = get_tenant_conn(db_name)
     try:
-        return seed_service.apply_seed(conn, nombre=nombre, admin_email=admin_email)
+        seed = seed_service.apply_seed(conn, nombre=nombre, admin_email=admin_email)
+        tenant_migrations.mark_all_applied(conn)
+        return seed
     finally:
         conn.close()
 

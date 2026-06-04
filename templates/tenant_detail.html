@@ -235,6 +235,18 @@
         {% else %}
         <p><em>Sin runtime aprovisionado todavía.</em></p>
         {% endif %}
+        <div class="plan-row" style="margin-top:.8rem; gap:.5rem;">
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
+                <input type="hidden" name="accion" value="restart"><button class="secondary outline btn-small" type="submit">Reiniciar instancia</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
+                  onsubmit="return confirm('Aplica migraciones aditivas a la BD de este cliente. ¿Continuar?')">
+                <input type="hidden" name="accion" value="migrate"><button class="secondary outline btn-small" type="submit">Migrar BD</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
+                <input type="hidden" name="accion" value="reprovision"><button class="secondary outline btn-small" type="submit">Reaprovisionar</button>
+            </form>
+        </div>
     </article>
 
     <article class="card">
