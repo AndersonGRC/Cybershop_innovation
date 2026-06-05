@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}Tenants · CyberShop Admin{% endblock %}
+{% block title %}Clientes · CyberShop Admin{% endblock %}
 
 {% block content %}
 <hgroup>
-    <h1>Tenants</h1>
+    <h1>Clientes</h1>
     <p>{{ tenants|length }} cliente{{ 's' if tenants|length != 1 else '' }} registrado{{ 's' if tenants|length != 1 else '' }}.</p>
 </hgroup>
 
@@ -13,7 +13,7 @@
                placeholder="Buscar por slug o nombre...">
     </form>
     <div style="text-align: right;">
-        <a role="button" href="{{ url_for('tenants.nuevo') }}">+ Nuevo tenant</a>
+        <a role="button" href="{{ url_for('tenants.nuevo') }}">+ Nuevo cliente</a>
     </div>
 </div>
 
@@ -70,11 +70,11 @@
 {% else %}
 <article>
     {% if search %}
-    <p>No se encontraron tenants para <strong>"{{ search }}"</strong>.</p>
+    <p>No se encontraron clientes para <strong>"{{ search }}"</strong>.</p>
     <a href="{{ url_for('tenants.lista') }}">Limpiar búsqueda</a>
     {% else %}
-    <p><em>Todavía no hay tenants registrados.</em></p>
-    <a href="{{ url_for('tenants.nuevo') }}" role="button">Crear el primer tenant</a>
+    <p><em>Todavía no hay clientes registrados.</em></p>
+    <a href="{{ url_for('tenants.nuevo') }}" role="button">Crear el primer cliente</a>
     {% endif %}
 </article>
 {% endif %}

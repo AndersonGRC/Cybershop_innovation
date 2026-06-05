@@ -13,11 +13,11 @@
     {% if admin %}
     <nav class="admin-nav">
         <ul>
-            <li><strong><a href="{{ url_for('dashboard.index') }}" class="brand">CyberShop Admin</a></strong></li>
+            <li><a href="{{ url_for('dashboard.index') }}" class="brand"><img src="{{ url_for('static', filename='logo.png') }}" alt="CyberShop" class="brand-logo"><strong>CyberShop Master</strong></a></li>
         </ul>
         <ul>
-            <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
-            <li><a href="{{ url_for('tenants.lista') }}">Tenants</a></li>
+            <li><a href="{{ url_for('dashboard.index') }}">Panel</a></li>
+            <li><a href="{{ url_for('tenants.lista') }}">Clientes</a></li>
             <li>
                 <details class="dropdown">
                     <summary>{{ admin.nombre }}</summary>

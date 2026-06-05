@@ -1,21 +1,21 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard · CyberShop Admin{% endblock %}
+{% block title %}Panel · CyberShop Admin{% endblock %}
 
 {% block content %}
 <hgroup>
-    <h1>Dashboard</h1>
+    <h1>Panel</h1>
     <p>Vista general del SaaS.</p>
 </hgroup>
 
 <section class="stats-grid">
     <article class="stat-card">
-        <small>Tenants activos</small>
+        <small>Clientes activos</small>
         <h2>{{ stats.tenants_activos }}</h2>
         <small class="muted">de {{ stats.tenants_total }} totales</small>
     </article>
 
     <article class="stat-card">
-        <small>Tenants suspendidos</small>
+        <small>Clientes suspendidos</small>
         <h2>{{ stats.tenants_suspendidos }}</h2>
     </article>
 
@@ -51,7 +51,7 @@
     <table>
         <thead>
             <tr>
-                <th>Tenant</th>
+                <th>Cliente</th>
                 <th>Client code</th>
                 <th>Key prefix</th>
                 <th>Último uso</th>

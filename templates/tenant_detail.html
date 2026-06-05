@@ -223,19 +223,39 @@
 
 <!-- ===== Tab: Técnico ===== -->
 <section class="tabpanel" id="tab-tecnico">
+    {% set estado_es = {'pending':'pendiente','running':'activa','stopped':'detenida','cancelled':'cancelada'} %}
     <article class="card">
         <h3>Instancia y dominio</h3>
-        {% if runtime %}
-        <table>
-            <tr><td>Dominio</td><td><code>https://{{ runtime.subdomain }}.cybershopcol.com</code></td></tr>
-            {% if runtime.custom_domain %}<tr><td>Dominio propio</td><td><code>{{ runtime.custom_domain }}</code></td></tr>{% endif %}
-            <tr><td>Puerto</td><td>{{ runtime.port }}</td></tr>
-            <tr><td>Estado instancia</td><td><span class="badge {{ 'badge-success' if runtime.instance_status=='running' else 'badge-warning' }}">{{ runtime.instance_status }}</span></td></tr>
+        <p><small>Configura el subdominio y, si lo tienes, el dominio propio del cliente (apúntalo primero en Cloudflare al servidor). Al guardar se asigna el puerto y se publica el dominio.</small></p>
+
+        <form method="post" action="{{ url_for('tenants.dominio_save', tenant_id=tenant.id) }}">
+            <div class="grid-2">
+                <label>Subdominio
+                    <input type="text" name="subdominio" value="{{ runtime.subdomain if runtime else tenant.slug }}" placeholder="{{ tenant.slug }}">
+                    <small class="muted">Se publica como <code>&lt;subdominio&gt;.cybershopcol.com</code></small>
+                </label>
+                <label>Dominio propio (opcional)
+                    <input type="text" name="dominio_propio" value="{{ (runtime.custom_domain or '') if runtime else '' }}" placeholder="ej. sutienda.com">
+                    <small class="muted">Primero apúntalo en Cloudflare a la IP del servidor.</small>
+                </label>
+            </div>
+            <button type="submit">Guardar dominio</button>
+        </form>
+
+        <table style="margin-top:1rem;">
+            <tr><td>URL del sitio</td><td>{% if runtime %}<code>https://{{ runtime.subdomain }}.cybershopcol.com</code>{% else %}—{% endif %}</td></tr>
+            {% if runtime and runtime.custom_domain %}<tr><td>Dominio propio</td><td><code>{{ runtime.custom_domain }}</code></td></tr>{% endif %}
+            <tr><td>Puerto</td><td>{{ runtime.port if runtime else '— (sin asignar)' }}</td></tr>
+            <tr><td>Estado de la instancia</td>
+                <td>
+                    {% if runtime %}
+                    <span class="badge {{ 'badge-success' if runtime.instance_status=='running' else 'badge-warning' }}">{{ estado_es.get(runtime.instance_status, runtime.instance_status) }}</span>
+                    {% else %}<span class="badge badge-muted">sin aprovisionar</span>{% endif %}
+                </td>
+            </tr>
         </table>
-        {% else %}
-        <p><em>Sin runtime aprovisionado todavía.</em></p>
-        {% endif %}
-        <div class="plan-row" style="margin-top:.8rem; gap:.5rem;">
+
+        <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap;">
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
                 <input type="hidden" name="accion" value="restart"><button class="secondary outline btn-small" type="submit">Reiniciar instancia</button>
             </form>

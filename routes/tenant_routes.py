@@ -206,6 +206,34 @@ def instancia_accion(tenant_id):
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
 
 
+@bp.route('/<int:tenant_id>/dominio', methods=['POST'])
+@login_required
+def dominio_save(tenant_id):
+    """Configura subdominio y dominio propio del cliente (aprovisiona si falta)."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    if not tenant.get('db_name'):
+        flash('El cliente no tiene BD; no se puede aprovisionar el dominio.', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+    subdominio = (request.form.get('subdominio') or tenant['slug']).strip().lower()
+    dominio_propio = (request.form.get('dominio_propio') or '').strip().lower() or None
+    try:
+        import provisioning_service as prov
+        r = prov.provision(tenant_id, tenant['slug'], tenant['db_name'],
+                           subdomain=subdominio, custom_domain=dominio_propio)
+        flash(f"Dominio configurado: {r['domain']}"
+              + (f" + {dominio_propio}" if dominio_propio else "")
+              + f" (puerto {r['port']}).", 'success')
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc).lower()
+        if 'unique' in msg or 'duplicate' in msg:
+            flash('Ese subdominio o dominio propio ya está usado por otro cliente. Elige otro.', 'error')
+        else:
+            flash(f'Error configurando dominio: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+
+
 @bp.route('/<int:tenant_id>/destroy', methods=['POST'])
 @login_required
 def destroy(tenant_id):
