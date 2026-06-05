@@ -316,3 +316,19 @@ sudo systemctl restart cybershop-admin
 - `migrate_tenants.py` es seguro de re-correr: salta lo ya aplicado por cliente.
 - Clientes **nuevos** ya traen todo por el dump; se marcan migraciones como aplicadas al crearse.
 - Tras tocar el schema del maestro: `refresh_tenant_schema.py` (para los nuevos) **+** una migración de tenant aditiva (para los existentes).
+
+## D. Reverse proxy de clientes con NGINX (default)
+
+`PROXY_BACKEND=nginx`. Al asignar el dominio de un cliente, el maestro escribe
+`/etc/nginx/sites-available/<dominio>.conf` (un `server` que hace
+`proxy_pass http://127.0.0.1:<puerto>`), lo enlaza a `sites-enabled`, corre
+`nginx -t` y `systemctl reload nginx`. Así el dominio queda **cuadrado con el
+puerto abierto** de esa instancia.
+
+- **SSL subdominios**: lo más simple es un **cert wildcard** `*.cybershopcol.com`
+  (certbot DNS-01 con Cloudflare) y definir `WILDCARD_SSL_CERT/KEY` → los
+  subdominios quedan en HTTPS al instante.
+- **SSL dominio propio**: `sudo certbot --nginx -d sutienda.com` tras vincularlo.
+- **sudoers** del maestro: además de lo anterior, permitir escribir en
+  `/etc/nginx/sites-available` y `sites-enabled`, y `nginx -t` + `systemctl reload nginx`.
+- El bloque exacto se previsualiza en el panel (pestaña Técnico → "Ver configuración del proxy").

@@ -82,9 +82,9 @@ def _teardown_runtime(tenant_id, slug):
     prov.stop_service(slug)
     rt = prov.get_runtime(tenant_id)
     if rt and rt.get('subdomain'):
-        prov.remove_caddy_site(prov.domain_for(rt['subdomain']))
+        prov.remove_site(prov.domain_for(rt['subdomain']))
     if rt and rt.get('custom_domain'):
-        prov.remove_caddy_site(rt['custom_domain'])
+        prov.remove_site(rt['custom_domain'])
 
 
 def destroy_soft(tenant_id: int) -> str:

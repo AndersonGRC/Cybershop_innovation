@@ -92,17 +92,28 @@ def detail(tenant_id):
     # Integraciones (env por instancia; no requiere la BD del cliente)
     integraciones = ints.get_integrations(tenant['slug'])
 
-    # Runtime (puerto, dominio, estado de instancia)
+    # Runtime (puerto, dominio, estado de instancia) + preview del proxy
+    proxy_preview = None
     try:
         import provisioning_service as prov
+        from config import Config
         runtime = prov.get_runtime(tenant_id)
+        if runtime and runtime.get('port'):
+            import proxy_service
+            dom = prov.domain_for(runtime['subdomain'])
+            proxy_preview = proxy_service.preview_block(dom, runtime['port'], is_subdomain=True)
+            if runtime.get('custom_domain'):
+                proxy_preview += "\n" + proxy_service.preview_block(runtime['custom_domain'], runtime['port'], is_subdomain=False)
     except Exception:  # noqa: BLE001
         runtime = None
 
+    from config import Config as _Cfg
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
         integraciones=integraciones, runtime=runtime,
+        proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
+        proxy_backend=_Cfg.PROXY_BACKEND,
         empresa_fields=ccs.EMPRESA_FIELDS, color_fields=ccs.COLOR_FIELDS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
     )
@@ -220,11 +231,14 @@ def dominio_save(tenant_id):
     dominio_propio = (request.form.get('dominio_propio') or '').strip().lower() or None
     try:
         import provisioning_service as prov
+        import proxy_service
         r = prov.provision(tenant_id, tenant['slug'], tenant['db_name'],
                            subdomain=subdominio, custom_domain=dominio_propio)
         flash(f"Dominio configurado: {r['domain']}"
               + (f" + {dominio_propio}" if dominio_propio else "")
-              + f" (puerto {r['port']}).", 'success')
+              + f" → puerto {r['port']}.", 'success')
+    except proxy_service.DomainError as exc:
+        flash(str(exc), 'error')
     except Exception as exc:  # noqa: BLE001
         msg = str(exc).lower()
         if 'unique' in msg or 'duplicate' in msg:

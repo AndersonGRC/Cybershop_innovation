@@ -17,6 +17,7 @@ import subprocess
 from config import Config
 from db import control_plane_cursor
 import integrations_service as ints
+import proxy_service
 
 
 IS_LINUX = (os.name == 'posix')
@@ -141,48 +142,31 @@ def stop_service(slug):
     return 'stopped'
 
 
-def caddy_block(domain, port) -> str:
-    return (f"{domain} {{\n"
-            f"    reverse_proxy 127.0.0.1:{port}\n"
-            f"}}\n")
+# Proxy (nginx por defecto, o Caddy) delegado a proxy_service.
+def write_site(domain, port, is_subdomain=True):
+    return proxy_service.write_site(domain, port, is_subdomain=is_subdomain)
 
 
-def write_caddy_site(domain, port):
-    if not IS_LINUX:
-        return 'skipped (no-linux)'
-    from pathlib import Path
-    sites = Path(Config.CADDY_SITES_DIR)
-    sites.mkdir(parents=True, exist_ok=True)
-    (sites / f"{domain}.caddy").write_text(caddy_block(domain, port), encoding='utf-8')
-    _run(['systemctl', 'reload', 'caddy'])
-    return 'written'
-
-
-def remove_caddy_site(domain):
-    if not IS_LINUX:
-        return 'skipped (no-linux)'
-    from pathlib import Path
-    f = Path(Config.CADDY_SITES_DIR) / f"{domain}.caddy"
-    if f.exists():
-        f.unlink()
-    _run(['systemctl', 'reload', 'caddy'])
-    return 'removed'
+def remove_site(domain):
+    return proxy_service.remove_site(domain)
 
 
 # ── Orquestador ────────────────────────────────────────────────
 def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
     """Asigna puerto, escribe env, registra runtime y (en Linux) levanta la
-    instancia + Caddy. Devuelve {port, domain, custom_domain, instance_status}."""
-    subdomain = (subdomain or slug).strip().lower()
+    instancia + el proxy (nginx/Caddy). Valida el dominio (seguridad).
+    Devuelve {port, domain, custom_domain, instance_status}."""
+    subdomain = proxy_service.validate_subdomain(subdomain or slug)
+    custom_domain = proxy_service.validate_domain(custom_domain) if custom_domain else None
     port = allocate_port(tenant_id)
     write_instance_env(slug, db_name, port, tenant_id)
 
     status = 'pending'
     if IS_LINUX:
         enable_service(slug)
-        write_caddy_site(domain_for(subdomain), port)
+        write_site(domain_for(subdomain), port, is_subdomain=True)
         if custom_domain:
-            write_caddy_site(custom_domain, port)
+            write_site(custom_domain, port, is_subdomain=False)
         status = 'running'
 
     register_runtime(tenant_id, port, subdomain, custom_domain, status=status)

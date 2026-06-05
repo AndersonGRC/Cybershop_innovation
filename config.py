@@ -64,8 +64,18 @@ class Config:
 
     # --- Aprovisionamiento de instancia + dominio (1C) ---
     BASE_DOMAIN = os.getenv('BASE_DOMAIN', 'cybershopcol.com')   # subdominios *.BASE_DOMAIN
+    SERVER_IP = os.getenv('SERVER_IP', '38.134.148.47')          # IP a la que apuntar el DNS
     APP_DIR = os.getenv('APP_DIR', '/var/www/CyberShop')          # código compartido (prod)
-    CADDY_SITES_DIR = os.getenv('CADDY_SITES_DIR', '/etc/caddy/sites')
     PORT_MIN = int(os.getenv('PORT_MIN', '8100'))
     PORT_MAX = int(os.getenv('PORT_MAX', '8999'))
     BACKUP_DIR = os.getenv('BACKUP_DIR', '/var/backups/cybershop')
+
+    # --- Reverse proxy (cuadra el dominio del cliente con su puerto) ---
+    PROXY_BACKEND = os.getenv('PROXY_BACKEND', 'nginx')           # 'nginx' | 'caddy'
+    NGINX_SITES_AVAILABLE = os.getenv('NGINX_SITES_AVAILABLE', '/etc/nginx/sites-available')
+    NGINX_SITES_ENABLED = os.getenv('NGINX_SITES_ENABLED', '/etc/nginx/sites-enabled')
+    CADDY_SITES_DIR = os.getenv('CADDY_SITES_DIR', '/etc/caddy/sites')
+    # Cert wildcard *.BASE_DOMAIN (opcional): si se define, los subdominios usan
+    # HTTPS de inmediato sin certbot por dominio.
+    WILDCARD_SSL_CERT = os.getenv('WILDCARD_SSL_CERT', '')
+    WILDCARD_SSL_KEY = os.getenv('WILDCARD_SSL_KEY', '')

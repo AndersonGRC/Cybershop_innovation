@@ -240,3 +240,8 @@ form .grid {
 /* Logo de marca en el navbar */
 .admin-nav a.brand { display: inline-flex; align-items: center; gap: .55rem; }
 .brand-logo { height: 30px; width: auto; }
+
+/* Módulo de dominio */
+.dns-hint { background: linear-gradient(135deg,#eef3ff,#f6f8fc); border:1px solid #dfe5f2; border-radius:10px; padding:.8rem 1rem; font-size:.92rem; }
+.dns-hint .ip { background:#122C94; color:#fff; padding:.1rem .5rem; border-radius:6px; font-weight:700; }
+.proxy-pre { background:#0e1830; color:#cfe0ff; padding:1rem; border-radius:10px; overflow-x:auto; font-size:.82rem; line-height:1.45; margin:.6rem 0 .2rem; }

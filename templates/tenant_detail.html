@@ -226,26 +226,35 @@
     {% set estado_es = {'pending':'pendiente','running':'activa','stopped':'detenida','cancelled':'cancelada'} %}
     <article class="card">
         <h3>Instancia y dominio</h3>
-        <p><small>Configura el subdominio y, si lo tienes, el dominio propio del cliente (apúntalo primero en Cloudflare al servidor). Al guardar se asigna el puerto y se publica el dominio.</small></p>
 
-        <form method="post" action="{{ url_for('tenants.dominio_save', tenant_id=tenant.id) }}">
-            <div class="grid-2">
+        <div class="dns-hint">
+            <strong>Paso 1 — Apunta el DNS</strong> (en Cloudflare): crea un registro
+            <code>A</code> del subdominio/dominio hacia la IP del servidor:
+            <code class="ip">{{ server_ip }}</code>.
+            <br><small class="muted">El subdominio puede ir cubierto por el comodín <code>*.cybershopcol.com</code> si ya existe.</small>
+        </div>
+
+        <form method="post" action="{{ url_for('tenants.dominio_save', tenant_id=tenant.id) }}" style="margin-top:1rem;">
+            <strong>Paso 2 — Asigna el dominio</strong>
+            <div class="grid-2" style="margin-top:.5rem;">
                 <label>Subdominio
-                    <input type="text" name="subdominio" value="{{ runtime.subdomain if runtime else tenant.slug }}" placeholder="{{ tenant.slug }}">
+                    <input type="text" name="subdominio" value="{{ runtime.subdomain if runtime else tenant.slug }}"
+                           placeholder="{{ tenant.slug }}" pattern="[a-z0-9-]+" title="minúsculas, números y guiones">
                     <small class="muted">Se publica como <code>&lt;subdominio&gt;.cybershopcol.com</code></small>
                 </label>
                 <label>Dominio propio (opcional)
-                    <input type="text" name="dominio_propio" value="{{ (runtime.custom_domain or '') if runtime else '' }}" placeholder="ej. sutienda.com">
-                    <small class="muted">Primero apúntalo en Cloudflare a la IP del servidor.</small>
+                    <input type="text" name="dominio_propio" value="{{ (runtime.custom_domain or '') if runtime else '' }}"
+                           placeholder="ej. sutienda.com" pattern="[a-z0-9.-]+\.[a-z]{2,}" title="ej. sutienda.com">
+                    <small class="muted">Requiere el registro DNS del Paso 1.</small>
                 </label>
             </div>
-            <button type="submit">Guardar dominio</button>
+            <button type="submit">Guardar dominio y publicar</button>
         </form>
 
         <table style="margin-top:1rem;">
             <tr><td>URL del sitio</td><td>{% if runtime %}<code>https://{{ runtime.subdomain }}.cybershopcol.com</code>{% else %}—{% endif %}</td></tr>
             {% if runtime and runtime.custom_domain %}<tr><td>Dominio propio</td><td><code>{{ runtime.custom_domain }}</code></td></tr>{% endif %}
-            <tr><td>Puerto</td><td>{{ runtime.port if runtime else '— (sin asignar)' }}</td></tr>
+            <tr><td>Puerto abierto</td><td>{% if runtime and runtime.port %}<code>127.0.0.1:{{ runtime.port }}</code>{% else %}— (sin asignar){% endif %}</td></tr>
             <tr><td>Estado de la instancia</td>
                 <td>
                     {% if runtime %}
@@ -254,6 +263,14 @@
                 </td>
             </tr>
         </table>
+
+        {% if proxy_preview %}
+        <details style="margin-top:.8rem;">
+            <summary><strong>Ver configuración del proxy ({{ proxy_backend }})</strong> — cómo el dominio apunta al puerto</summary>
+            <pre class="proxy-pre">{{ proxy_preview }}</pre>
+            <small class="muted">El maestro escribe este bloque en el servidor y recarga {{ proxy_backend }}. Aquí solo es previsualización.</small>
+        </details>
+        {% endif %}
 
         <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap;">
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">

@@ -55,3 +55,12 @@ PSQL_BIN=C:\Program Files\PostgreSQL\17\bin\psql.exe
 # Si se define, el login es por PIN (sin email/password). Vacio = email/password.
 # En produccion: combinar con allow-list de IP en el proxy (ver DEPLOY.md).
 MASTER_PIN=1122
+
+# --- Reverse proxy de clientes (cuadra dominio con puerto) ---
+PROXY_BACKEND=nginx                       # nginx | caddy
+NGINX_SITES_AVAILABLE=/etc/nginx/sites-available
+NGINX_SITES_ENABLED=/etc/nginx/sites-enabled
+SERVER_IP=38.134.148.47                    # IP a la que apunta el DNS de los clientes
+# Cert wildcard *.cybershopcol.com (opcional, para HTTPS inmediato en subdominios):
+# WILDCARD_SSL_CERT=/etc/letsencrypt/live/cybershopcol.com/fullchain.pem
+# WILDCARD_SSL_KEY=/etc/letsencrypt/live/cybershopcol.com/privkey.pem
