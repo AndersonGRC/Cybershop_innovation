@@ -84,6 +84,13 @@ def apply_seed(conn, *, nombre, admin_email, admin_nombre='Administrador',
                 (tenant_local_id, (tenant_slug or 'principal')[:80], nombre[:180]),
             )
 
+    # 0b) Asegurar unicidad para los upserts ON CONFLICT (el schema de prod
+    #     puede no traer la PK/UNIQUE que el app asume). Aditivo e idempotente.
+    for _tbl, _col in (('cliente_config', 'clave'), ('config_secciones', 'clave')):
+        cur.execute("SELECT to_regclass(%s)", (f'public.{_tbl}',))
+        if cur.fetchone()[0]:
+            cur.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{_tbl}_{_col} ON {_tbl} ({_col})")
+
     # 1) roles
     for rid, rnombre in ROLES:
         cur.execute(
