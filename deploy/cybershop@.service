@@ -13,8 +13,10 @@ Wants=postgresql.service
 
 [Service]
 Type=simple
-User=cybershop
-Group=cybershop
+# Igual que el servicio principal cybershop.service (que corre como root).
+# Ajustar a un usuario dedicado al endurecer (Etapa 2).
+User=root
+Group=root
 WorkingDirectory=/var/www/CyberShop/app
 EnvironmentFile=/etc/cybershop/%i.env
 ExecStart=/var/www/CyberShop/app/env/bin/gunicorn \
