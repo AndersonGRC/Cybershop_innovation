@@ -61,7 +61,7 @@ def generate_temp_password(n: int = 12) -> str:
 
 
 def apply_seed(conn, *, nombre, admin_email, admin_nombre='Administrador',
-               admin_password=None, tenant_local_id=1) -> dict:
+               admin_password=None, tenant_local_id=1, tenant_slug='principal') -> dict:
     """Aplica el seed sobre la conexión de la BD del tenant (ya con schema).
 
     Devuelve {'admin_email', 'admin_password'} (password en claro, mostrar 1 vez).
@@ -71,6 +71,16 @@ def apply_seed(conn, *, nombre, admin_email, admin_nombre='Administrador',
     pwd_hash = generate_password_hash(admin_password)
 
     cur = conn.cursor()
+
+    # 0) saas_tenants: fila por defecto (id local). En esquemas con FK
+    #    usuarios.tenant_id -> saas_tenants(id) es obligatoria antes del admin.
+    cur.execute("SELECT to_regclass('public.saas_tenants')")
+    if cur.fetchone()[0]:
+        cur.execute(
+            "INSERT INTO saas_tenants (id, slug, nombre, estado, is_default, created_at, updated_at) "
+            "VALUES (%s, %s, %s, 'activo', TRUE, NOW(), NOW()) ON CONFLICT (id) DO NOTHING",
+            (tenant_local_id, (tenant_slug or 'principal')[:80], nombre[:180]),
+        )
 
     # 1) roles
     for rid, rnombre in ROLES:
