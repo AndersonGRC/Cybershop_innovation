@@ -21,6 +21,7 @@ import proxy_service
 
 
 IS_LINUX = (os.name == 'posix')
+SUDO = ['sudo'] if IS_LINUX else []   # www-data corre systemctl con sudo (NOPASSWD acotado)
 
 
 # ── Tabla runtime (defensivo) ──────────────────────────────────
@@ -124,21 +125,22 @@ def _run(cmd):
 def enable_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(['systemctl', 'enable', '--now', f'cybershop@{slug}'])
+    _run(SUDO + ['systemctl', 'enable', f'cybershop@{slug}'])
+    _run(SUDO + ['systemctl', 'start', f'cybershop@{slug}'])
     return 'enabled'
 
 
 def restart_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(['systemctl', 'restart', f'cybershop@{slug}'])
+    _run(SUDO + ['systemctl', 'restart', f'cybershop@{slug}'])
     return 'restarted'
 
 
 def stop_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(['systemctl', 'stop', f'cybershop@{slug}'])
+    _run(SUDO + ['systemctl', 'stop', f'cybershop@{slug}'])
     return 'stopped'
 
 

@@ -18,6 +18,9 @@ from config import Config
 
 
 IS_LINUX = (os.name == 'posix')
+# En el servidor el maestro corre como www-data: systemctl/nginx van con sudo
+# (reglas NOPASSWD acotadas en /etc/sudoers.d/cybershop-admin).
+SUDO = ['sudo'] if IS_LINUX else []
 
 _SUBDOMAIN_RE = re.compile(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')
 _DOMAIN_RE = re.compile(r'^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
@@ -95,29 +98,32 @@ def _write_nginx(domain: str, port: int, use_wildcard: bool) -> str:
     avail = Path(Config.NGINX_SITES_AVAILABLE) / f"{domain}.conf"
     avail.parent.mkdir(parents=True, exist_ok=True)
     avail.write_text(block, encoding='utf-8')
-    enabled = Path(Config.NGINX_SITES_ENABLED) / f"{domain}.conf"
-    if not enabled.exists():
-        try:
-            enabled.symlink_to(avail)
-        except Exception:
-            pass
-    test = _run(['nginx', '-t'])
+    # Modelo sites-available/sites-enabled: symlink solo si son carpetas distintas.
+    # Si AVAILABLE == ENABLED (carpeta de include dedicada), no hay symlink.
+    if Path(Config.NGINX_SITES_AVAILABLE).resolve() != Path(Config.NGINX_SITES_ENABLED).resolve():
+        enabled = Path(Config.NGINX_SITES_ENABLED) / f"{domain}.conf"
+        if not enabled.exists():
+            try:
+                enabled.symlink_to(avail)
+            except Exception:
+                pass
+    test = _run(SUDO + ['nginx', '-t'])
     if test.returncode == 0:
-        _run(['systemctl', 'reload', 'nginx'])
+        _run(SUDO + ['systemctl', 'reload', 'nginx'])
     return block
 
 
 def _remove_nginx(domain: str):
     if not IS_LINUX:
         return
-    for d in (Config.NGINX_SITES_AVAILABLE, Config.NGINX_SITES_ENABLED):
+    for d in {Config.NGINX_SITES_AVAILABLE, Config.NGINX_SITES_ENABLED}:
         f = Path(d) / f"{domain}.conf"
         if f.exists() or f.is_symlink():
             try:
                 f.unlink()
             except Exception:
                 pass
-    _run(['systemctl', 'reload', 'nginx'])
+    _run(SUDO + ['systemctl', 'reload', 'nginx'])
 
 
 # ── caddy ──────────────────────────────────────────────────────
