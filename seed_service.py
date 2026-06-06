@@ -76,11 +76,13 @@ def apply_seed(conn, *, nombre, admin_email, admin_nombre='Administrador',
     #    usuarios.tenant_id -> saas_tenants(id) es obligatoria antes del admin.
     cur.execute("SELECT to_regclass('public.saas_tenants')")
     if cur.fetchone()[0]:
-        cur.execute(
-            "INSERT INTO saas_tenants (id, slug, nombre, estado, is_default, created_at, updated_at) "
-            "VALUES (%s, %s, %s, 'activo', TRUE, NOW(), NOW()) ON CONFLICT (id) DO NOTHING",
-            (tenant_local_id, (tenant_slug or 'principal')[:80], nombre[:180]),
-        )
+        cur.execute("SELECT 1 FROM saas_tenants WHERE id = %s", (tenant_local_id,))
+        if not cur.fetchone():
+            cur.execute(
+                "INSERT INTO saas_tenants (id, slug, nombre, estado, is_default, created_at, updated_at) "
+                "VALUES (%s, %s, %s, 'activo', TRUE, NOW(), NOW())",
+                (tenant_local_id, (tenant_slug or 'principal')[:80], nombre[:180]),
+            )
 
     # 1) roles
     for rid, rnombre in ROLES:
