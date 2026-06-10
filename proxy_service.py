@@ -20,7 +20,10 @@ from config import Config
 IS_LINUX = (os.name == 'posix')
 # En el servidor el maestro corre como www-data: systemctl/nginx van con sudo
 # (reglas NOPASSWD acotadas en /etc/sudoers.d/cybershop-admin).
-SUDO = ['sudo'] if IS_LINUX else []
+# Rutas absolutas: el servicio del maestro tiene PATH restringido al venv.
+SUDO = ['/usr/bin/sudo'] if IS_LINUX else []
+SYSTEMCTL = '/usr/bin/systemctl'
+NGINX = '/usr/sbin/nginx'
 
 _SUBDOMAIN_RE = re.compile(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')
 _DOMAIN_RE = re.compile(r'^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
@@ -107,9 +110,9 @@ def _write_nginx(domain: str, port: int, use_wildcard: bool) -> str:
                 enabled.symlink_to(avail)
             except Exception:
                 pass
-    test = _run(SUDO + ['nginx', '-t'])
+    test = _run(SUDO + [NGINX, '-t'])
     if test.returncode == 0:
-        _run(SUDO + ['systemctl', 'reload', 'nginx'])
+        _run(SUDO + [SYSTEMCTL, 'reload', 'nginx'])
     return block
 
 
@@ -123,7 +126,7 @@ def _remove_nginx(domain: str):
                 f.unlink()
             except Exception:
                 pass
-    _run(SUDO + ['systemctl', 'reload', 'nginx'])
+    _run(SUDO + [SYSTEMCTL, 'reload', 'nginx'])
 
 
 # ── caddy ──────────────────────────────────────────────────────

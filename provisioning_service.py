@@ -21,7 +21,10 @@ import proxy_service
 
 
 IS_LINUX = (os.name == 'posix')
-SUDO = ['sudo'] if IS_LINUX else []   # www-data corre systemctl con sudo (NOPASSWD acotado)
+# Ruta absoluta: el servicio del maestro corre con PATH restringido al venv
+# (sin /usr/bin), por lo que 'sudo'/'systemctl' a secas no se resuelven.
+SUDO = ['/usr/bin/sudo'] if IS_LINUX else []   # www-data corre systemctl con sudo (NOPASSWD acotado)
+SYSTEMCTL = '/usr/bin/systemctl'
 
 
 # ── Tabla runtime (defensivo) ──────────────────────────────────
@@ -125,24 +128,24 @@ def _run(cmd):
 def enable_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + ['systemctl', 'enable', f'cybershop@{slug}'])
-    _run(SUDO + ['systemctl', 'start', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'enable', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'start', f'cybershop@{slug}'])
     return 'enabled'
 
 
 def restart_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + ['systemctl', 'restart', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'restart', f'cybershop@{slug}'])
     return 'restarted'
 
 
 def stop_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + ['systemctl', 'stop', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'stop', f'cybershop@{slug}'])
     # disable: un cliente suspendido NO debe auto-arrancar tras un reboot
-    _run(SUDO + ['systemctl', 'disable', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'disable', f'cybershop@{slug}'])
     return 'stopped'
 
 
