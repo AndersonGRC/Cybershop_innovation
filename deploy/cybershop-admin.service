@@ -31,8 +31,13 @@ StandardError=journal
 SyslogIdentifier=cybershop-admin
 
 # Hardening basico
-NoNewPrivileges=true
+# El maestro DEBE poder escalar via sudo acotado (sudoers cybershop-admin):
+# systemctl de instancias cybershop@*, nginx -t y reload. Por eso NO se usa
+# NoNewPrivileges. El hardening se conserva via ProtectSystem + excepciones.
+NoNewPrivileges=false
 ProtectSystem=full
+# Rutas que el maestro SI escribe (env por instancia, vhosts, backups)
+ReadWritePaths=/etc/cybershop /etc/nginx/cybershop-sites /var/backups/cybershop
 ProtectHome=true
 PrivateTmp=true
 
