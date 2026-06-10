@@ -40,6 +40,7 @@ SECTION_FIELDS = [
     ('mostrar_about', 'Bloque quiénes somos'),
     ('mostrar_mision_vision', 'Misión y visión'),
     ('mostrar_publicaciones', 'Novedades del home'),
+    ('mostrar_software_banner', 'Banda del Software (CTA a /software)'),
     ('mostrar_mapa', 'Mapa de ubicación'),
     ('mostrar_contacto', 'Formulario de contacto'),
     ('mostrar_nav_productos', 'Menú: Productos'),
