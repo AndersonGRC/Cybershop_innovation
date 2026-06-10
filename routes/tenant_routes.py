@@ -93,13 +93,19 @@ def detail(tenant_id):
     integraciones = ints.get_integrations(tenant['slug'])
 
     # Facturación electrónica: estado local (sin red) + prefill desde BILLING_*
-    import dian_service as ds
-    dian = ds.get_status(tenant['slug'])
-    _env = ints.read_env(tenant['slug'])
-    dian['prefill'] = {
+    # dian_service es trabajo en progreso: si aún no existe, el panel funciona
+    # igual y la tarjeta DIAN simplemente no se muestra.
+    dian = None
+    try:
+        import dian_service as ds
+        dian = ds.get_status(tenant['slug'])
+        _env = ints.read_env(tenant['slug'])
+        dian['prefill'] = {
         'nit': _env.get('BILLING_ID', ''),
-        'razon_social': _env.get('BILLING_NOMBRE', '') or tenant.get('nombre', ''),
-    }
+            'razon_social': _env.get('BILLING_NOMBRE', '') or tenant.get('nombre', ''),
+        }
+    except Exception:
+        dian = None
 
     # Runtime (puerto, dominio, estado de instancia) + preview del proxy
     proxy_preview = None
@@ -224,6 +230,11 @@ def toggle(tenant_id):
 @login_required
 def dian_provision(tenant_id):
     """Provisiona el tenant en FacturacionDIAN y escribe DIAN_* en su env."""
+    try:
+        import dian_service  # noqa: F401
+    except Exception:
+        flash('Función DIAN aún no disponible (dian_service en desarrollo).', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
     tenant = tenant_service.get_tenant(tenant_id)
     if not tenant:
         abort(404)
@@ -260,6 +271,11 @@ def dian_provision(tenant_id):
 @login_required
 def dian_validate(tenant_id):
     """Valida la cadena completa admin → servicio DIAN → credenciales del cliente."""
+    try:
+        import dian_service  # noqa: F401
+    except Exception:
+        flash('Función DIAN aún no disponible (dian_service en desarrollo).', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
     tenant = tenant_service.get_tenant(tenant_id)
     if not tenant:
         abort(404)

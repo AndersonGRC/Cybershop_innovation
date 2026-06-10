@@ -158,6 +158,56 @@
         <h3>Conexiones y credenciales de API</h3>
         <p><small>Estas credenciales se guardan en el entorno de la instancia del cliente y se aplican al reiniciarla. Los secretos se muestran enmascarados: deja el campo en blanco para conservar el valor actual, o escribe uno nuevo para reemplazarlo.</small></p>
     </article>
+
+    <!-- Facturación electrónica: provisión + validación contra el microservicio DIAN -->
+    {% if dian %}
+    <article class="card">
+        <h3>Facturación Electrónica (DIAN)</h3>
+        <p>
+            {% if dian.env_ok %}<mark>✓ Credenciales DIAN configuradas en la instancia</mark>
+            {% else %}<mark style="background:#fde8e8;color:#b42318;">Sin credenciales DIAN — el cliente no puede emitir facturas</mark>{% endif %}
+            {% if not dian.master_configured %}<mark style="background:#fde8e8;color:#b42318;">DIAN_MASTER_KEY no configurada en el maestro</mark>{% endif %}
+        </p>
+        <p><small>Servicio: <code>{{ dian.service_url }}</code> ·
+            Env del cliente:
+            {% for k, presente in dian.env.items() %}
+            <span title="{{ k }}">{{ '✓' if presente else '✗' }} {{ k.replace('DIAN_', '') }}</span>{{ ' · ' if not loop.last }}
+            {% endfor %}
+        </small></p>
+        {% if not dian.env_ok %}
+        <form method="post" action="{{ url_for('tenants.dian_provision', tenant_id=tenant.id) }}">
+            <div class="grid-2">
+                <label>NIT (solo dígitos)
+                    <input type="text" name="nit" value="{{ dian.prefill.nit }}" required>
+                </label>
+                <label>DV <span class="muted">(vacío = se calcula)</span>
+                    <input type="text" name="dv" value="" placeholder="auto">
+                </label>
+                <label>Razón social
+                    <input type="text" name="razon_social" value="{{ dian.prefill.razon_social }}" required>
+                </label>
+                <label>Ambiente
+                    <select name="ambiente">
+                        <option value="habilitacion" selected>habilitacion (pruebas)</option>
+                        <option value="produccion">produccion</option>
+                    </select>
+                </label>
+                <label>Prefijo de facturación <span class="muted">(opcional)</span>
+                    <input type="text" name="prefijo" value="">
+                </label>
+            </div>
+            <button type="submit">Provisionar en servicio DIAN</button>
+            <p><small>Crea el tenant en FacturacionDIAN, guarda su API key en el env de la instancia
+            y la reinicia. Después: subir certificado .p12 y resolución desde el panel DIAN.</small></p>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('tenants.dian_validate', tenant_id=tenant.id) }}" style="margin-top:.5rem;">
+            <button type="submit" class="secondary">Validar cadena completa</button>
+            <small class="muted">Comprueba módulo activo, servicio vivo y API key del cliente aceptada.</small>
+        </form>
+    </article>
+    {% endif %}
+
     <form method="post" action="{{ url_for('tenants.integraciones_save', tenant_id=tenant.id) }}">
         {% for grp in integraciones %}
         <details class="card int-group" {% if loop.first %}open{% endif %}>
