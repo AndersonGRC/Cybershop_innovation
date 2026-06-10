@@ -60,4 +60,6 @@ app = create_app()
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=Config.PORT, debug=False)
+    # Bind a 127.0.0.1 por defecto: el panel solo se alcanza vía nginx (que
+    # aplica el allow-list + TLS). Defensa en profundidad sobre el firewall.
+    app.run(host=Config.HOST, port=Config.PORT, debug=False)

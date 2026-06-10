@@ -21,6 +21,8 @@ class Config:
 
     # --- Server ---
     PORT = int(os.getenv('PORT', '5002'))
+    # 127.0.0.1: el panel solo se sirve detrás de nginx (allow-list + TLS).
+    HOST = os.getenv('HOST', '127.0.0.1')
 
     # --- Postgres: control plane ---
     CP_DB_NAME     = os.getenv('CONTROL_PLANE_DB_NAME', 'saas_control_plane')
