@@ -133,13 +133,19 @@ def apply_seed(conn, *, nombre, admin_email, admin_nombre='Administrador',
             (clave, valor),
         )
 
-    # 4) config_secciones (todas activas)
+    # 4) config_secciones (todas activas, salvo el modulo de venta del
+    # software, que va APAGADO por defecto: solo lo activa el maestro para
+    # los sitios que comercializan el Software CyberShop)
     for clave in SECCIONES:
         cur.execute(
             "INSERT INTO config_secciones (clave, valor) VALUES (%s, 'true') "
             "ON CONFLICT (clave) DO NOTHING",
             (clave,),
         )
+    cur.execute(
+        "INSERT INTO config_secciones (clave, valor) VALUES ('mostrar_modulo_software', 'false') "
+        "ON CONFLICT (clave) DO NOTHING"
+    )
 
     # 5) género de muestra (catálogo no vacío)
     cur.execute("SELECT 1 FROM generos LIMIT 1")
