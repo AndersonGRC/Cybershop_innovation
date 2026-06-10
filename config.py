@@ -66,6 +66,7 @@ class Config:
 
     # --- Aprovisionamiento de instancia + dominio (1C) ---
     BASE_DOMAIN = os.getenv('BASE_DOMAIN', 'cybershopcol.com')   # subdominios *.BASE_DOMAIN
+    CERTBOT_EMAIL = os.getenv('CERTBOT_EMAIL', 'cybershop.digitalsales@gmail.com')
     SERVER_IP = os.getenv('SERVER_IP', '38.134.148.47')          # IP a la que apuntar el DNS
     APP_DIR = os.getenv('APP_DIR', '/var/www/CyberShop')          # código compartido (prod)
     PORT_MIN = int(os.getenv('PORT_MIN', '8100'))

@@ -169,12 +169,18 @@ def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
     write_instance_env(slug, db_name, port, tenant_id)
 
     status = 'pending'
+    ssl_msgs = []
     if IS_LINUX:
         enable_service(slug)
         write_site(domain_for(subdomain), port, is_subdomain=True)
         if custom_domain:
             write_site(custom_domain, port, is_subdomain=False)
         status = 'running'
+        # SSL automatico: el dominio queda publicado en HTTPS sin pasos manuales.
+        # (Requiere que el DNS ya apunte al servidor; si no, certbot falla y el
+        # mensaje queda visible en el panel para reintentar con Reaprovisionar.)
+        for dom in {domain_for(subdomain), custom_domain} - {None}:
+            ssl_msgs.append(proxy_service.issue_ssl(dom))
 
     register_runtime(tenant_id, port, subdomain, custom_domain, status=status)
     return {
@@ -182,4 +188,5 @@ def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
         'domain': domain_for(subdomain),
         'custom_domain': custom_domain,
         'instance_status': status,
+        'ssl': ' | '.join(ssl_msgs) if ssl_msgs else None,
     }

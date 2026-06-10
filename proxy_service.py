@@ -24,6 +24,7 @@ IS_LINUX = (os.name == 'posix')
 SUDO = ['/usr/bin/sudo'] if IS_LINUX else []
 SYSTEMCTL = '/usr/bin/systemctl'
 NGINX = '/usr/sbin/nginx'
+CERTBOT = '/usr/bin/certbot'
 
 _SUBDOMAIN_RE = re.compile(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')
 _DOMAIN_RE = re.compile(r'^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
@@ -47,8 +48,8 @@ def validate_domain(dom: str) -> str:
     return dom
 
 
-def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+def _run(cmd, timeout=60):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
 # ── nginx ──────────────────────────────────────────────────────
@@ -176,3 +177,17 @@ def preview_block(domain: str, port: int, is_subdomain: bool = True) -> str:
     if Config.PROXY_BACKEND == 'caddy':
         return caddy_block(domain, port)
     return nginx_block(domain, port, use_wildcard=is_subdomain)
+
+
+def issue_ssl(domain: str) -> str:
+    """Emite/instala el certificado del dominio con certbot --nginx (idempotente).
+    Devuelve un mensaje corto para mostrar en el panel."""
+    if not IS_LINUX:
+        return 'ssl: omitido (dev)'
+    r = _run(SUDO + [CERTBOT, '--nginx', '-d', domain, '--non-interactive',
+                     '--agree-tos', '-m', Config.CERTBOT_EMAIL, '--redirect'],
+             timeout=180)
+    if r.returncode == 0:
+        return f'ssl: certificado activo para {domain}'
+    detalle = (r.stderr or r.stdout or '').strip().splitlines()
+    return 'ssl: fallo certbot (%s)' % (detalle[-1][:120] if detalle else 'sin detalle')

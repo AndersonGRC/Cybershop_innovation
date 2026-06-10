@@ -166,6 +166,21 @@ def modulos_save(tenant_id):
         else:
             ms.save_modules(tenant_id, request.form.getlist('modulo'))
             flash('Módulos del cliente actualizados.', 'success')
+        # Degradación controlada: si Ventas/POS quedó habilitado pero PayU no
+        # está configurado, avisar (el sitio oculta el pago en línea solo).
+        try:
+            import integrations_service as ints
+            t = tenant_service.get_tenant(tenant_id)
+            envv = ints.read_env(t['slug']) if t else {}
+            ventas_on = ('pos' in request.form.getlist('modulo')
+                         or 'orders' in request.form.getlist('modulo')
+                         or (request.form.get('plan') or '').strip() != '')
+            if ventas_on and not envv.get('PAYU_MERCHANT_ID'):
+                flash('Ventas habilitado pero PayU NO está configurado para este cliente: '
+                      'su tienda mostrará el catálogo y el carrito, pero el pago en línea '
+                      'quedará oculto (solo WhatsApp) hasta llenar la pestaña Integraciones.', 'error')
+        except Exception:
+            pass
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando módulos: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#modulos')
@@ -237,6 +252,11 @@ def dominio_save(tenant_id):
         flash(f"Dominio configurado: {r['domain']}"
               + (f" + {dominio_propio}" if dominio_propio else "")
               + f" → puerto {r['port']}.", 'success')
+        if r.get('ssl'):
+            ok = 'certificado activo' in r['ssl']
+            flash(r['ssl'], 'success' if ok else 'error')
+            if not ok:
+                flash('Si el DNS acaba de crearse, espera 1-2 min y usa "Reaprovisionar" para reintentar el SSL.', 'error')
     except proxy_service.DomainError as exc:
         flash(str(exc), 'error')
     except Exception as exc:  # noqa: BLE001
