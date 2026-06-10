@@ -141,6 +141,8 @@ def stop_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
     _run(SUDO + ['systemctl', 'stop', f'cybershop@{slug}'])
+    # disable: un cliente suspendido NO debe auto-arrancar tras un reboot
+    _run(SUDO + ['systemctl', 'disable', f'cybershop@{slug}'])
     return 'stopped'
 
 
