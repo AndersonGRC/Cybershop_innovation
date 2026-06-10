@@ -53,6 +53,11 @@ SECTION_FIELDS = [
 _ALL_CONFIG_KEYS = [k for k, *_ in EMPRESA_FIELDS] + [k for k, _ in COLOR_FIELDS]
 _SECTION_KEYS = [k for k, _ in SECTION_FIELDS]
 
+# Defaults cuando la clave no existe en la BD del cliente. Casi todo es ON por
+# defecto, pero la venta del Software CyberShop es OFF (espejo del app, que
+# usa config_global.get('mostrar_modulo_software', false)).
+_SECTION_DEFAULTS = {'mostrar_modulo_software': False}
+
 
 def get_config(tenant_id: int) -> dict:
     """Devuelve {empresa: {k:v}, colores: {k:v}} desde cliente_config."""
@@ -87,7 +92,7 @@ def get_sections(tenant_id: int) -> dict:
             (_SECTION_KEYS,),
         )
         stored = {r['clave']: r['valor'] for r in cur.fetchall()}
-    return {k: _as_bool(stored.get(k), True) for k, _ in SECTION_FIELDS}
+    return {k: _as_bool(stored.get(k), _SECTION_DEFAULTS.get(k, True)) for k, _ in SECTION_FIELDS}
 
 
 def save_sections(tenant_id: int, form) -> None:
