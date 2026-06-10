@@ -60,28 +60,79 @@ _SECTION_DEFAULTS = {'mostrar_modulo_software': False}
 
 
 def get_config(tenant_id: int) -> dict:
-    """Devuelve {empresa: {k:v}, colores: {k:v}} desde cliente_config."""
+    """Valores de TODOS los campos del sitio (catalogo completo).
+
+    Prioridad de lectura (igual que el app): public_site_settings (estructurada)
+    -> cliente_config (legacy) -> default del catalogo.
+    """
+    from tenant_site_fields import SITE_FIELDS
+    keys = [f['key'] for f in SITE_FIELDS]
+    structured, legacy = {}, {}
     with tenant_cursor(tenant_id) as cur:
+        cur.execute("SELECT to_regclass('public.public_site_settings')")
+        if cur.fetchone()[0]:
+            cur.execute("SELECT key, value FROM public_site_settings WHERE key = ANY(%s)", (keys,))
+            structured = {r['key']: r['value'] for r in cur.fetchall()}
+        cur.execute("SELECT clave, valor FROM cliente_config WHERE clave = ANY(%s)", (keys,))
+        legacy = {r['clave']: r['valor'] for r in cur.fetchall()}
+    values = {}
+    for f in SITE_FIELDS:
+        k = f['key']
+        v = structured.get(k)
+        if v is None or v == '':
+            v = legacy.get(k)
+        if v is None or v == '':
+            v = f.get('default') or ''
+        values[k] = v
+    return {'values': values}
+
+
+def save_config(tenant_id: int, form) -> int:
+    """Guarda los campos enviados en AMBAS tablas (estructurada + legacy),
+    igual que hace el app, para que el cambio surta efecto siempre.
+    Devuelve cuantos campos se guardaron."""
+    from tenant_site_fields import SITE_FIELDS
+    guardados = 0
+    with tenant_cursor(tenant_id) as cur:
+        # La tabla estructurada puede no existir en BDs antiguas (legacy)
         cur.execute(
-            "SELECT clave, valor FROM cliente_config WHERE clave = ANY(%s)",
-            (_ALL_CONFIG_KEYS,),
+            """
+            CREATE TABLE IF NOT EXISTS public_site_settings (
+                key VARCHAR(120) PRIMARY KEY,
+                value TEXT,
+                value_type VARCHAR(30),
+                group_name VARCHAR(60),
+                description TEXT,
+                sort_order INTEGER,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """
         )
-        values = {r['clave']: r['valor'] for r in cur.fetchall()}
-    return {
-        'empresa': {k: values.get(k, '') for k, *_ in EMPRESA_FIELDS},
-        'colores': {k: values.get(k, '') for k, _ in COLOR_FIELDS},
-    }
-
-
-def save_config(tenant_id: int, form) -> None:
-    """Guarda empresa + colores (solo claves conocidas)."""
-    with tenant_cursor(tenant_id) as cur:
-        for clave, _label, *_ in EMPRESA_FIELDS:
-            if clave in form:
-                _upsert(cur, clave, form.get(clave, '').strip(), 'text', 'empresa')
-        for clave, _label in COLOR_FIELDS:
-            if clave in form:
-                _upsert(cur, clave, form.get(clave, '').strip(), 'color', 'colores')
+        for f in SITE_FIELDS:
+            k = f['key']
+            if k not in form:
+                continue
+            v = (form.get(k) or '').strip()
+            if f.get('type') == 'color' and not v:
+                continue   # un color vacio romperia el sitio
+            cur.execute(
+                """
+                INSERT INTO public_site_settings (key, value, value_type, group_name, description, sort_order, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                """,
+                (k, v, f.get('type'), f.get('group'), f.get('description'), f.get('order')),
+            )
+            cur.execute(
+                """
+                INSERT INTO cliente_config (clave, valor, tipo, grupo)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor
+                """,
+                (k, v, f.get('type') or 'text', f.get('group') or 'general'),
+            )
+            guardados += 1
+    return guardados
 
 
 def get_sections(tenant_id: int) -> dict:

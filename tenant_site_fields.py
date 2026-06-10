@@ -1,0 +1,67 @@
+"""Catalogo COMPLETO de campos del sitio publico de cada cliente.
+
+Espejo 1:1 de /admin/sitio-publico del app (PUBLIC_BRANDING_FIELDS +
+PUBLIC_LANDING_FIELDS + PUBLIC_COLOR_FIELDS). Generado desde el codigo
+del app; si el app agrega campos, regenerar este catalogo.
+"""
+
+SITE_FIELDS = [
+    {'key': 'empresa_nombre', 'label': 'Nombre comercial', 'description': 'Nombre visible del sitio y de la empresa.', 'type': 'text', 'group': 'empresa', 'default': 'CyberShop', 'order': 1},
+    {'key': 'empresa_tagline', 'label': 'Mensaje corto de marca', 'description': 'Texto breve usado en el pie de pagina del sitio publico.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Soluciones tecnológicas pensadas para crecer contigo.', 'order': 10},
+    {'key': 'empresa_email', 'label': 'Correo publico', 'description': 'Correo visible para clientes y formularios.', 'type': 'email', 'group': 'empresa', 'default': 'cybershop.digitalsales@gmail.com', 'order': 2},
+    {'key': 'contacto_email_destino', 'label': 'Correo destino del formulario', 'description': 'Destino interno de los mensajes enviados desde el home.', 'type': 'email', 'group': 'sitio_publico', 'default': 'cybershop.digitalsales@gmail.com', 'order': 11},
+    {'key': 'empresa_telefono', 'label': 'Telefono publico', 'description': 'Telefono visible en la comunicacion publica.', 'type': 'tel', 'group': 'empresa', 'default': '3015963776', 'order': 3},
+    {'key': 'empresa_whatsapp', 'label': 'WhatsApp', 'description': 'Numero en formato internacional para el boton flotante.', 'type': 'text', 'group': 'empresa', 'default': '573027974969', 'order': 4},
+    {'key': 'empresa_direccion', 'label': 'Direccion', 'description': 'Direccion visible para clientes.', 'type': 'text', 'group': 'empresa', 'default': '', 'order': 5},
+    {'key': 'empresa_website', 'label': 'Sitio web corporativo', 'description': 'URL oficial mostrable en documentos y secciones de contacto.', 'type': 'url', 'group': 'empresa', 'default': '', 'order': 6},
+    {'key': 'empresa_maps_embed', 'label': 'Mapa embebido', 'description': 'URL completa del mapa embebido de Google Maps.', 'type': 'url', 'group': 'empresa', 'default': 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3976.1438661161997!2d-74.12405722491505!3d4.7450433952301445!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e3f8481ac8fae15%3A0xd086f2615f6ea83!2sCra.%20151%20%23136a11%2C%20Suba%2C%20Bogot%C3%A1!5e0!3m2!1ses!2sco!4v1737344695200!5m2!1ses!2sco', 'order': 7},
+    {'key': 'empresa_facebook', 'label': 'Facebook', 'description': 'URL de la red social.', 'type': 'url', 'group': 'empresa', 'default': '#', 'order': 8},
+    {'key': 'empresa_instagram', 'label': 'Instagram', 'description': 'URL de la red social.', 'type': 'url', 'group': 'empresa', 'default': '#', 'order': 9},
+    {'key': 'empresa_linkedin', 'label': 'LinkedIn', 'description': 'URL de la red social.', 'type': 'url', 'group': 'empresa', 'default': '#', 'order': 10},
+    {'key': 'empresa_youtube', 'label': 'YouTube', 'description': 'URL de la red social.', 'type': 'url', 'group': 'empresa', 'default': '#', 'order': 11},
+    {'key': 'empresa_twitter', 'label': 'X / Twitter', 'description': 'URL de la red social.', 'type': 'url', 'group': 'empresa', 'default': '#', 'order': 12},
+    {'key': 'empresa_copyright', 'label': 'Texto de copyright', 'description': 'Texto visible en footer y plantillas.', 'type': 'text', 'group': 'empresa', 'default': 'CyberShop', 'order': 13},
+    {'key': 'empresa_logo_url', 'label': 'Ruta del logo', 'description': 'Se actualiza automaticamente al subir un logo desde este modulo.', 'type': 'text', 'group': 'sitio_publico', 'default': '/static/img/Logo.png', 'order': 12},
+    {'key': 'home_about_title', 'label': 'Titulo quienes somos', 'description': 'Titulo principal del bloque institucional del home.', 'type': 'text', 'group': 'sitio_publico', 'default': '', 'order': 20},
+    {'key': 'home_about_intro', 'label': 'Texto principal quienes somos', 'description': 'Primer parrafo del bloque quienes somos.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Somos una empresa comprometida con la innovación y la excelencia tecnológica. Nuestro objetivo es ofrecer soluciones integrales que impulsen el desarrollo de nuestros clientes y optimicen sus operaciones. Nos destacamos por nuestra experiencia, dedicación y enfoque personalizado, siempre buscando superar expectativas.', 'order': 21},
+    {'key': 'home_about_body', 'label': 'Texto complementario quienes somos', 'description': 'Segundo parrafo del bloque institucional.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Con un equipo altamente capacitado y una visión orientada al futuro, trabajamos para convertirnos en tu aliado estratégico en tecnología. Transformamos desafíos en oportunidades, asegurándonos de que cada proyecto sea un éxito.', 'order': 22},
+    {'key': 'home_mision_titulo', 'label': 'Titulo misión', 'description': 'Titulo del bloque de mision.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Misión', 'order': 23},
+    {'key': 'home_mision_texto', 'label': 'Texto misión', 'description': 'Contenido completo de la misión.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Nos dedicamos a ofrecer soluciones tecnológicas integrales y personalizadas que impulsen el crecimiento y la eficiencia de nuestros clientes. A través de nuestra experiencia, dedicación y enfoque innovador, buscamos optimizar sus operaciones, superar expectativas y convertirnos en su aliado estratégico en el mundo digital.', 'order': 24},
+    {'key': 'home_vision_titulo', 'label': 'Titulo visión', 'description': 'Titulo del bloque de vision.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Visión', 'order': 25},
+    {'key': 'home_vision_texto', 'label': 'Texto visión', 'description': 'Contenido completo de la visión.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Ser reconocidos como líderes en innovación y excelencia tecnológica, siendo el referente principal para empresas y personas que buscan soluciones confiables y vanguardistas. Aspiramos a construir un futuro donde la tecnología sea accesible, eficiente y transformadora.', 'order': 26},
+    {'key': 'home_publicaciones_titulo', 'label': 'Titulo novedades', 'description': 'Encabezado del bloque de publicaciones del home.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Novedades', 'order': 27},
+    {'key': 'home_contacto_titulo', 'label': 'Titulo contacto', 'description': 'Titulo visible sobre el formulario de contacto.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Contáctanos', 'order': 28},
+    {'key': 'home_contacto_intro', 'label': 'Texto contacto', 'description': 'Mensaje corto para invitar al contacto.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Cuéntanos lo que necesitas y nuestro equipo te responderá lo antes posible.', 'order': 29},
+    {'key': 'servicios_hero_titulo', 'label': 'Titulo de la pagina de servicios', 'description': 'Titulo principal de la pagina /servicios.', 'type': 'text', 'group': 'sitio_publico', 'default': 'Servicios', 'order': 30},
+    {'key': 'servicios_hero_subtitulo', 'label': 'Subtitulo de la pagina de servicios', 'description': 'Mensaje corto de apertura de la pagina /servicios.', 'type': 'textarea', 'group': 'sitio_publico', 'default': 'Presentamos soluciones especializadas para operación, soporte y crecimiento digital.', 'order': 31},
+    {'key': 'color_secundario', 'label': 'Navbar y footer', 'description': 'Fondo del navbar superior y del footer del sitio.', 'type': 'color', 'group': 'colores', 'ui_group': 'estructura', 'default': '#0e1b33', 'order': 101},
+    {'key': 'color_transicion', 'label': 'Gradiente del header', 'description': 'Segundo tono del degradado del header y secciones destacadas.', 'type': 'color', 'group': 'colores', 'ui_group': 'estructura', 'default': '#16315f', 'order': 102},
+    {'key': 'color_fondo_destacado', 'label': 'Fondo de bloques claros', 'description': 'Fondo de secciones como Quiénes somos y bloques institucionales.', 'type': 'color', 'group': 'colores', 'ui_group': 'estructura', 'default': '#edf3ff', 'order': 103},
+    {'key': 'color_primario', 'label': 'Color principal', 'description': 'Encabezados, links del admin y primer tono de botones primarios.', 'type': 'color', 'group': 'colores', 'ui_group': 'botones', 'default': '#122C94', 'order': 104},
+    {'key': 'color_primario_oscuro', 'label': 'Color principal oscuro', 'description': 'Hover y variante oscura del color principal. Sidebar del admin.', 'type': 'color', 'group': 'colores', 'ui_group': 'botones', 'default': '#091C5A', 'order': 105},
+    {'key': 'color_botones', 'label': 'Botones secundarios', 'description': 'Botones de acción secundaria en el sitio público.', 'type': 'color', 'group': 'colores', 'ui_group': 'botones', 'default': '#122C94', 'order': 106},
+    {'key': 'color_hover_menu', 'label': 'Hover del menú admin', 'description': 'Resaltado al pasar el cursor sobre el menú lateral del admin.', 'type': 'color', 'group': 'colores', 'ui_group': 'botones', 'default': '#fb8500', 'order': 107},
+    {'key': 'color_acento', 'label': 'Acento principal', 'description': 'Badges, etiquetas destacadas y precios tachados.', 'type': 'color', 'group': 'colores', 'ui_group': 'acentos', 'default': '#e60023', 'order': 108},
+    {'key': 'color_acento_secundario', 'label': 'Acento secundario', 'description': 'Iconos de búsqueda, métodos de pago y acentos complementarios.', 'type': 'color', 'group': 'colores', 'ui_group': 'acentos', 'default': '#fb8500', 'order': 109},
+    {'key': 'color_producto_boton', 'label': 'Precio en tarjeta', 'description': 'Color del precio en la tarjeta del catálogo y en el popup de producto.', 'type': 'color', 'group': 'colores', 'ui_group': 'catalogo', 'default': '#091C5A', 'order': 110},
+    {'key': 'color_producto_popup', 'label': 'Tag y botón "Ver detalles"', 'description': 'Tag de categoría, título del popup y botón outline "Ver detalles".', 'type': 'color', 'group': 'colores', 'ui_group': 'catalogo', 'default': '#122C94', 'order': 111},
+    {'key': 'color_exito', 'label': 'Botón "Añadir al carrito"', 'description': 'Botón principal de compra (tarjeta, popup) y botón "Pagar" en carrito.', 'type': 'color', 'group': 'colores', 'ui_group': 'catalogo', 'default': '#28a745', 'order': 112},
+    {'key': 'color_exito_hover', 'label': 'Hover botón "Añadir"', 'description': 'Estado hover del botón de compra en tarjeta y popup.', 'type': 'color', 'group': 'colores', 'ui_group': 'catalogo', 'default': '#218838', 'order': 113},
+    {'key': 'color_carrito', 'label': 'Encabezado del carrito', 'description': 'Cabecera de la tabla del carrito y botón flotante de acceso rápido.', 'type': 'color', 'group': 'colores', 'ui_group': 'carrito', 'default': '#122C94', 'order': 114},
+    {'key': 'color_carrito_hover', 'label': 'Hover botones carrito', 'description': 'Estado hover de los botones +/- dentro del panel del carrito.', 'type': 'color', 'group': 'colores', 'ui_group': 'carrito', 'default': '#091C5A', 'order': 115},
+    {'key': 'color_alerta_fondo', 'label': 'Fondo de alertas', 'description': 'Fondo del cuadro de diálogo de confirmaciones y errores.', 'type': 'color', 'group': 'colores', 'ui_group': 'alertas', 'default': '#ffffff', 'order': 116},
+    {'key': 'color_alerta_texto', 'label': 'Texto de alertas', 'description': 'Color del texto principal dentro de los diálogos de alerta.', 'type': 'color', 'group': 'colores', 'ui_group': 'alertas', 'default': '#333333', 'order': 117},
+    {'key': 'color_alerta_confirmar', 'label': 'Botón confirmar', 'description': 'Botón de acción positiva (Sí, Aceptar) en los diálogos.', 'type': 'color', 'group': 'colores', 'ui_group': 'alertas', 'default': '#122C94', 'order': 118},
+    {'key': 'color_alerta_cancelar', 'label': 'Botón cancelar', 'description': 'Botón de cancelación o rechazo en los diálogos.', 'type': 'color', 'group': 'colores', 'ui_group': 'alertas', 'default': '#dc3545', 'order': 119},
+    {'key': 'color_software_primario', 'label': 'Software · Principal', 'description': 'Color principal de la landing /software y la página de descarga (hero, botones, títulos).', 'type': 'color', 'group': 'colores', 'ui_group': 'descarga', 'default': '#122C94', 'order': 120},
+    {'key': 'color_software_oscuro', 'label': 'Software · Principal oscuro', 'description': 'Tono oscuro del degradado del hero y secciones destacadas de la landing de software.', 'type': 'color', 'group': 'colores', 'ui_group': 'descarga', 'default': '#091C5A', 'order': 121},
+    {'key': 'color_software_acento', 'label': 'Software · Acento', 'description': 'Color de acento (botón de descarga, checks, badges) en /software y /descargar.', 'type': 'color', 'group': 'colores', 'ui_group': 'descarga', 'default': '#29A9E2', 'order': 122},
+    {'key': 'color_software_acento_texto', 'label': 'Software · Texto sobre acento', 'description': 'Color del texto que va encima del botón/acento de descarga (debe contrastar con el acento).', 'type': 'color', 'group': 'colores', 'ui_group': 'descarga', 'default': '#06263f', 'order': 123},
+]
+
+# Grupos en el orden de la UI
+SITE_GROUPS = [
+    ('empresa', 'Datos de la empresa (nombre, contacto, redes, logo)'),
+    ('sitio_publico', 'Textos del sitio público (home, misión/visión, contacto, servicios)'),
+    ('colores', 'Colores del sitio (estructura, botones, catálogo, carrito, alertas, software)'),
+]

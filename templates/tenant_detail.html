@@ -53,35 +53,40 @@
 <section class="tabpanel is-active" id="tab-config">
     {% if cfg %}
     <form method="post" action="{{ url_for('tenants.config_save', tenant_id=tenant.id) }}">
+        {% for gkey, gtitle in site_groups %}
         <article class="card">
-            <h3>Datos de la empresa</h3>
-            <div class="grid-2">
-                {% for key, label, tipo in empresa_fields %}
-                <label>{{ label }}
-                    <input type="text" name="{{ key }}" value="{{ cfg.empresa.get(key, '') }}">
-                </label>
-                {% endfor %}
-            </div>
-        </article>
-
-        <article class="card">
-            <h3>Colores de marca</h3>
-            <p><small>El cliente también puede ajustarlos desde su panel. El admin del cliente no cambia de estructura, solo su sitio público.</small></p>
+            <h3>{{ gtitle }}</h3>
+            {% if gkey == 'colores' %}
+            <p><small>Mismas variables que el sitio usa en vivo. El cliente también puede ajustarlas desde su propio panel.</small></p>
             <div class="color-grid">
-                {% for key, label in color_fields %}
-                <div class="color-field">
-                    <span class="color-label">{{ label }}</span>
+                {% for f in site_fields if f.group == 'colores' %}
+                <div class="color-field" title="{{ f.description }}">
+                    <span class="color-label">{{ f.label }}</span>
                     <span class="color-row">
-                        <input type="color" name="{{ key }}" value="{{ cfg.colores.get(key, '') or '#122C94' }}">
-                        <input type="text" class="color-hex" value="{{ cfg.colores.get(key, '') }}"
-                               oninput="this.previousElementSibling.value=this.value" placeholder="#122C94">
+                        <input type="color" name="{{ f.key }}" value="{{ cfg['values'].get(f.key) or f.default or '#122C94' }}">
+                        <input type="text" class="color-hex" value="{{ cfg['values'].get(f.key, '') }}"
+                               oninput="this.previousElementSibling.value=this.value" placeholder="{{ f.default }}">
                     </span>
                 </div>
                 {% endfor %}
             </div>
+            {% else %}
+            <div class="grid-2">
+                {% for f in site_fields if f.group == gkey %}
+                <label title="{{ f.description }}">{{ f.label }}
+                    {% if f.type == 'textarea' %}
+                    <textarea name="{{ f.key }}" rows="3">{{ cfg['values'].get(f.key, '') }}</textarea>
+                    {% else %}
+                    <input type="{{ 'url' if f.type == 'url' else ('email' if f.type == 'email' else 'text') }}"
+                           name="{{ f.key }}" value="{{ cfg['values'].get(f.key, '') }}" placeholder="{{ f.default or '' }}">
+                    {% endif %}
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
         </article>
-
-        <button type="submit">Guardar configuración</button>
+        {% endfor %}
+        <button type="submit">Guardar configuración (todos los campos)</button>
     </form>
     {% else %}
     <p><em>El cliente no tiene BD accesible para configurar.</em></p>

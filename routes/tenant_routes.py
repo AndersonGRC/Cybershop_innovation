@@ -92,6 +92,15 @@ def detail(tenant_id):
     # Integraciones (env por instancia; no requiere la BD del cliente)
     integraciones = ints.get_integrations(tenant['slug'])
 
+    # Facturación electrónica: estado local (sin red) + prefill desde BILLING_*
+    import dian_service as ds
+    dian = ds.get_status(tenant['slug'])
+    _env = ints.read_env(tenant['slug'])
+    dian['prefill'] = {
+        'nit': _env.get('BILLING_ID', ''),
+        'razon_social': _env.get('BILLING_NOMBRE', '') or tenant.get('nombre', ''),
+    }
+
     # Runtime (puerto, dominio, estado de instancia) + preview del proxy
     proxy_preview = None
     try:
@@ -111,10 +120,11 @@ def detail(tenant_id):
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
-        integraciones=integraciones, runtime=runtime,
+        integraciones=integraciones, dian=dian, runtime=runtime,
         proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
         proxy_backend=_Cfg.PROXY_BACKEND,
-        empresa_fields=ccs.EMPRESA_FIELDS, color_fields=ccs.COLOR_FIELDS,
+        site_fields=__import__('tenant_site_fields').SITE_FIELDS,
+        site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
     )
 
@@ -179,6 +189,11 @@ def modulos_save(tenant_id):
                 flash('Ventas habilitado pero PayU NO está configurado para este cliente: '
                       'su tienda mostrará el catálogo y el carrito, pero el pago en línea '
                       'quedará oculto (solo WhatsApp) hasta llenar la pestaña Integraciones.', 'error')
+            fe_on = ('facturacion_electronica' in request.form.getlist('modulo'))
+            if fe_on and not envv.get('DIAN_API_KEY'):
+                flash('Facturación DIAN activada pero el cliente NO tiene credenciales del '
+                      'servicio: la app no podrá emitir facturas. Ve a Integraciones → '
+                      'Facturación Electrónica y usa "Provisionar en servicio DIAN".', 'error')
         except Exception:
             pass
     except Exception as exc:  # noqa: BLE001
@@ -203,6 +218,70 @@ def toggle(tenant_id):
     except Exception as exc:  # noqa: BLE001
         flash(f'Error cambiando estado: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+
+
+@bp.route('/<int:tenant_id>/dian/provision', methods=['POST'])
+@login_required
+def dian_provision(tenant_id):
+    """Provisiona el tenant en FacturacionDIAN y escribe DIAN_* en su env."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    import dian_service as ds
+    try:
+        r = ds.provision(
+            tenant['slug'],
+            nombre=tenant.get('nombre') or tenant['slug'],
+            nit=request.form.get('nit', ''),
+            razon_social=request.form.get('razon_social', ''),
+            dv=(request.form.get('dv') or '').strip() or None,
+            ambiente=(request.form.get('ambiente') or 'habilitacion').strip(),
+            prefijo=request.form.get('prefijo', ''),
+        )
+        flash(f"Tenant DIAN creado (NIT {r['nit']}-{r['dv']}) y credenciales escritas "
+              "en el env de la instancia.", 'success')
+        # Reiniciar la instancia para que la app tome las credenciales nuevas
+        try:
+            import provisioning_service as prov
+            prov.restart_service(tenant['slug'])
+            flash('Instancia reiniciada: la facturación electrónica ya está operativa '
+                  '(falta subir certificado y resolución en el panel DIAN).', 'success')
+        except Exception:  # noqa: BLE001 — en dev local no hay systemd
+            flash('Reinicia la instancia del cliente (pestaña Técnico) para aplicar '
+                  'las credenciales.', 'warning')
+    except ds.DianError as exc:
+        flash(str(exc), 'error')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error provisionando en DIAN: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
+
+
+@bp.route('/<int:tenant_id>/dian/validate', methods=['POST'])
+@login_required
+def dian_validate(tenant_id):
+    """Valida la cadena completa admin → servicio DIAN → credenciales del cliente."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    import dian_service as ds
+    try:
+        checks = ds.validate(tenant['slug'])
+        # Estado del módulo en la app del cliente (cliente_config)
+        try:
+            mods = ms.get_modules(tenant_id)
+            fe = next((m for m in mods if m['code'] == 'facturacion_electronica'), None)
+            checks.insert(0, (bool(fe and fe['is_active']),
+                              "Módulo 'Facturación DIAN' activo en la app del cliente"))
+        except Exception:  # noqa: BLE001 — BD del tenant caída no invalida el resto
+            pass
+        ok = sum(1 for passed, _ in checks if passed)
+        for passed, label in checks:
+            flash(('✓ ' if passed else '✗ ') + label, 'success' if passed else 'error')
+        flash(f"Validación DIAN: {ok}/{len(checks)} comprobaciones OK.",
+              'success' if ok == len(checks) else 'warning')
+    except ds.DianError as exc:
+        flash(str(exc), 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
 
 
 @bp.route('/<int:tenant_id>/instancia', methods=['POST'])
