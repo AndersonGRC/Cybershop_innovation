@@ -37,10 +37,13 @@ SyslogIdentifier=cybershop-admin
 NoNewPrivileges=false
 ProtectSystem=full
 # Rutas que el maestro SI escribe (env por instancia, vhosts, backups, y los
-# directorios de certbot: el SSL automático lanza certbot que guarda el cert
-# en /etc/letsencrypt — sin esto ProtectSystem=full lo bloquea aunque corra
-# como root vía sudo, porque hereda el namespace de solo-lectura del servicio).
-ReadWritePaths=/etc/cybershop /etc/nginx/cybershop-sites /var/backups/cybershop /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt
+# directorios de certbot). Notas sobre el SSL automático:
+#  - /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt: certbot guarda
+#    ahí el cert; sin esto ProtectSystem=full lo bloquea aunque corra como root
+#    vía sudo (hereda el namespace de solo-lectura del servicio).
+#  - /etc/nginx (no solo cybershop-sites): el plugin --nginx de certbot toma un
+#    lock en /etc/nginx ('Unable to lock /etc/nginx' si falta).
+ReadWritePaths=/etc/cybershop /etc/nginx /var/backups/cybershop /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt
 ProtectHome=true
 PrivateTmp=true
 
