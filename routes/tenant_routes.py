@@ -202,6 +202,16 @@ def modulos_save(tenant_id):
                       'Facturación Electrónica y usa "Provisionar en servicio DIAN".', 'error')
         except Exception:
             pass
+        # Reiniciar la instancia para que el cambio tome efecto al instante: el
+        # app cachea los flags de módulos por proceso, sin reinicio el toggle no
+        # se vería hasta el siguiente arranque. Aplica a todos los módulos.
+        try:
+            import provisioning_service as prov
+            t = tenant_service.get_tenant(tenant_id)
+            if t and prov.IS_LINUX:
+                prov.restart_service(t['slug'])
+        except Exception:
+            pass
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando módulos: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#modulos')

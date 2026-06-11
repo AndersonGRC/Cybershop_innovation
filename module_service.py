@@ -29,6 +29,7 @@ MODULES = [
     ('share', 'Compartir Archivos', 'Carpetas y archivos compartidos por link.', 'clientes', 'share_habilitado', True),
     ('restaurant_tables', 'Mesas Restaurante', 'Plano de mesas, cuenta abierta y consumos.', 'operacion', 'restaurant_tables_habilitado', True),
     ('facturacion_electronica', 'Facturación DIAN', 'Facturación electrónica integrada con DIAN.', 'finanzas', 'facturacion_electronica', False),
+    ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
 ]
 
 MODULE_BY_CODE = {m[0]: m for m in MODULES}

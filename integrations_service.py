@@ -50,6 +50,17 @@ GROUPS = [
         ('BILLING_TELEFONO', 'Teléfono', False, 'text', None),
         ('BILLING_TEXTO_PAGO', 'Texto de pago', False, 'text', None),
     ]),
+    ('Facturación Electrónica (microservicio DIAN)', [
+        ('DIAN_SERVICE_URL', 'URL del servicio (con /api/v1)', False, 'text', None),
+        ('DIAN_API_KEY', 'API Key del tenant DIAN', True, 'text', None),
+        ('DIAN_MASTER_KEY', 'Master Key (SSO panel DIAN)', True, 'text', None),
+        ('DIAN_UI_URL', 'URL pública del panel DIAN', False, 'text', None),
+    ]),
+    ('Asistente IA (Ollama / OpenAI-compatible)', [
+        ('AI_BASE_URL', 'URL del servidor IA (ej. http://10.200.0.3:11434)', False, 'text', None),
+        ('AI_MODEL', 'Modelo (ej. qwen2.5:14b-instruct)', False, 'text', None),
+        ('AI_API_KEY', 'API Key (vacío para Ollama)', True, 'text', None),
+    ]),
 ]
 
 _FIELD_BY_KEY = {f[0]: f for grp, fields in GROUPS for f in fields}
@@ -120,6 +131,14 @@ def save_integrations(slug: str, form) -> None:
                 env[key] = submitted
         else:
             env[key] = submitted
+    _write_env(slug, env)
+
+
+def set_env_values(slug: str, values: dict) -> None:
+    """Setea/actualiza claves puntuales del env de la instancia preservando
+    el resto (usado por dian_service al provisionar credenciales)."""
+    env = read_env(slug)
+    env.update({k: str(v) for k, v in values.items()})
     _write_env(slug, env)
 
 
