@@ -41,7 +41,19 @@ class Config:
     KMS_KEY = os.getenv('KMS_KEY', '')
 
     # --- PIN de acceso al panel maestro (numérico). Vacío = usar email/password ---
+    # API interna (venta automática): secreto compartido con el app principal
+    INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', '')
+
     MASTER_PIN = os.getenv('MASTER_PIN', '')
+
+    # --- Facturación electrónica (microservicio FacturacionDIAN) ---
+    # URL base del API del microservicio (incluye /api/v1) y su MASTER_API_KEY.
+    # Con esto el maestro provisiona tenants DIAN y escribe las DIAN_* en el
+    # env de cada instancia al activar el módulo facturacion_electronica.
+    DIAN_SERVICE_URL = os.getenv('DIAN_SERVICE_URL', 'http://127.0.0.1:5003/api/v1')
+    DIAN_MASTER_KEY = os.getenv('DIAN_MASTER_KEY', '')
+    # URL pública del panel DIAN (SSO desde la app del cliente). Vacío = /ui.
+    DIAN_UI_URL = os.getenv('DIAN_UI_URL', '')
 
     # --- Tenant provisioning ---
     # DB maestra (plantilla de estructura) de la que se genera el schema dump.
