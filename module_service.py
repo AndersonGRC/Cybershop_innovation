@@ -71,14 +71,26 @@ def get_modules(tenant_id: int) -> list:
 
 
 def _upsert_flag(cur, config_key, active, descripcion):
+    """Activa/desactiva un flag de módulo en cliente_config.
+
+    No usa `ON CONFLICT` porque la tabla `cliente_config` de los tenants NO
+    tiene índice único en `clave` (varía por cliente), y ON CONFLICT exige uno
+    → "there is no unique or exclusion constraint matching the ON CONFLICT
+    specification". Hacemos UPDATE y, si no afectó filas, INSERT. Idempotente.
+    """
+    valor = 'true' if active else 'false'
     cur.execute(
-        """
-        INSERT INTO cliente_config (clave, valor, tipo, grupo, descripcion, orden)
-        VALUES (%s, %s, 'boolean', 'modulos', %s, 0)
-        ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, grupo = 'modulos'
-        """,
-        (config_key, 'true' if active else 'false', descripcion),
+        "UPDATE cliente_config SET valor = %s, grupo = 'modulos' WHERE clave = %s",
+        (valor, config_key),
     )
+    if cur.rowcount == 0:
+        cur.execute(
+            """
+            INSERT INTO cliente_config (clave, valor, tipo, grupo, descripcion, orden)
+            VALUES (%s, %s, 'boolean', 'modulos', %s, 0)
+            """,
+            (config_key, valor, descripcion),
+        )
 
 
 def set_module(tenant_id: int, code: str, active: bool):

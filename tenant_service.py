@@ -257,31 +257,46 @@ def _apply_schema(db_name: str):
         )
 
 
-def _apply_seed(db_name: str, nombre: str, admin_email: str, slug: str = 'principal') -> dict:
+def _apply_seed(db_name: str, nombre: str, admin_email: str, slug: str = 'principal',
+                admin_nombre: str = 'Administrador') -> dict:
     """Aplica el seed mínimo (roles, admin, colores, secciones) a la BD nueva
-    y marca las migraciones de tenant actuales como aplicadas (el dump ya las
-    incluye), para que `migrate_tenants` solo corra las futuras.
+    y la pone en la ÚLTIMA versión de estructura.
+
+    Para garantizar que un cliente nuevo nazca SIEMPRE al día, ejecuta las
+    migraciones de tenant (aditivas e idempotentes): si el dump del schema ya
+    las incluye son no-ops; si el dump quedó desactualizado, cierran la brecha.
+    Si alguna migración fallara, no se aborta la creación (la estructura del
+    dump ya es funcional) y se podrá reintentar con "Actualizar a última versión".
 
     Devuelve {'admin_email', 'admin_password'} (mostrar 1 vez).
     """
     import tenant_migrations
     conn = get_tenant_conn(db_name)
     try:
-        seed = seed_service.apply_seed(conn, nombre=nombre, admin_email=admin_email, tenant_slug=slug)
-        tenant_migrations.mark_all_applied(conn)
-        return seed
+        seed = seed_service.apply_seed(conn, nombre=nombre, admin_email=admin_email,
+                                       admin_nombre=admin_nombre or 'Administrador',
+                                       tenant_slug=slug)
     finally:
         conn.close()
+    try:
+        tenant_migrations.migrate_db(db_name)
+    except Exception:  # noqa: BLE001 — una migración rota no impide crear al cliente
+        conn2 = get_tenant_conn(db_name)
+        try:
+            tenant_migrations.mark_all_applied(conn2)
+        finally:
+            conn2.close()
+    return seed
 
 
-def _insert_tenant_rows(slug: str, nombre: str, db_name: str) -> int:
+def _insert_tenant_rows(slug: str, nombre: str, db_name: str, plan: str = 'estandar') -> int:
     """INSERT en tenants + tenant_databases. Devuelve tenant_id."""
     db_password_enc = aes_gcm_encrypt(Config.PG_PASSWORD)
 
     with control_plane_cursor(dict_cursor=True) as cur:
         cur.execute(
-            "INSERT INTO tenants (slug, nombre) VALUES (%s, %s) RETURNING id",
-            (slug, nombre)
+            "INSERT INTO tenants (slug, nombre, plan) VALUES (%s, %s, %s) RETURNING id",
+            (slug, nombre, plan)
         )
         tenant_id = cur.fetchone()['id']
 
@@ -305,7 +320,8 @@ def _insert_tenant_rows(slug: str, nombre: str, db_name: str) -> int:
 
 
 def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
-                  admin_email: str = '') -> dict:
+                  admin_email: str = '', admin_nombre: str = 'Administrador',
+                  plan: str = 'estandar') -> dict:
     """Orquesta la creación end-to-end de un tenant nuevo.
 
     Pasos:
@@ -330,6 +346,13 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
 
     slug = validate_slug(slug)
     admin_email = (admin_email or '').strip().lower() or f'admin@{slug}.local'
+    admin_nombre = (admin_nombre or '').strip() or 'Administrador'
+
+    # Validar plan contra el catálogo de módulos (default estandar si no calza).
+    import module_service as _ms
+    plan = (plan or '').strip().lower()
+    if plan not in _ms.PLANS:
+        plan = 'estandar'
 
     if _slug_exists(slug):
         raise TenantCreationError(f"Ya existe un tenant con slug '{slug}'.")
@@ -362,21 +385,29 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
 
     # Paso 6: seed mínimo (roles, admin, colores, secciones)
     try:
-        seed = _apply_seed(db_name, nombre, admin_email, slug=slug)
+        seed = _apply_seed(db_name, nombre, admin_email, slug=slug, admin_nombre=admin_nombre)
     except Exception as exc:  # noqa: BLE001
         raise TenantCreationError(
             f"Seed inicial falló en {db_name}: {exc}\n"
             f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
         ) from exc
 
-    # Paso 7: registrar en control plane
+    # Paso 7: registrar en control plane (con el plan elegido)
     try:
-        tenant_id = _insert_tenant_rows(slug, nombre, db_name)
+        tenant_id = _insert_tenant_rows(slug, nombre, db_name, plan=plan)
     except Exception as exc:  # noqa: BLE001
         raise TenantCreationError(
             f"INSERT en tenants/tenant_databases falló: {exc}\n"
             f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
         ) from exc
+
+    # Paso 7b: activar los módulos que incluye el plan (escribe en la BD del
+    # tenant; no aborta la creación si falla — los módulos se pueden ajustar
+    # luego desde el detalle del cliente).
+    try:
+        _ms.apply_plan(tenant_id, plan)
+    except Exception:  # noqa: BLE001
+        pass
 
     # Paso 7: primera API key
     try:
@@ -399,6 +430,7 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
         'tenant_id':      tenant_id,
         'slug':           slug,
         'nombre':         nombre,
+        'plan':           plan,
         'db_name':        db_name,
         'api_key':        key_info['api_key'],
         'client_code':    key_info['client_code'],

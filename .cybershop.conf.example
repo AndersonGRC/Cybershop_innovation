@@ -64,3 +64,12 @@ SERVER_IP=38.134.148.47                    # IP a la que apunta el DNS de los cl
 # Cert wildcard *.cybershopcol.com (opcional, para HTTPS inmediato en subdominios):
 # WILDCARD_SSL_CERT=/etc/letsencrypt/live/cybershopcol.com/fullchain.pem
 # WILDCARD_SSL_KEY=/etc/letsencrypt/live/cybershopcol.com/privkey.pem
+
+# --- Facturación electrónica (microservicio FacturacionDIAN) ---
+# URL del API del microservicio (incluye /api/v1). Prod: corre en el mismo VPS.
+DIAN_SERVICE_URL=http://127.0.0.1:5003/api/v1
+# MASTER_API_KEY del microservicio (FacturacionDIAN/app/.env). Permite al
+# maestro crear tenants DIAN y habilita el SSO del panel en las instancias.
+DIAN_MASTER_KEY=
+# URL pública del panel DIAN (se escribe en el env de cada cliente para el SSO)
+DIAN_UI_URL=

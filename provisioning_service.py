@@ -13,6 +13,7 @@ registrar tenant_runtime. Los pasos de systemd/Caddy se ejecutan SOLO en Linux.
 import os
 import secrets
 import subprocess
+import threading
 
 from config import Config
 from db import control_plane_cursor
@@ -103,6 +104,23 @@ def get_runtime(tenant_id):
         return cur.fetchone()
 
 
+# ── Overrides de interfaz por instancia (theme a medida del sitio público) ────
+# Carpeta FUERA del repo compartido (/var/www/CyberShop); `git pull` nunca la
+# toca. Si existe `<root>/<slug>/templates|static`, la app del cliente pisa con
+# ellos las plantillas/estáticos compartidos SOLO para ese cliente.
+OVERRIDES_ROOT = os.getenv('INSTANCE_OVERRIDES_ROOT', '/var/www/cybershop-overrides')
+
+
+def ensure_overrides_dir(slug):
+    """Crea (idempotente) la carpeta de overrides del cliente con `templates/` y
+    `static/`. Devuelve la ruta. Solo crea en Linux (prod); en dev solo calcula."""
+    d = os.path.join(OVERRIDES_ROOT, slug)
+    if IS_LINUX:
+        for sub in ('templates', 'static'):
+            os.makedirs(os.path.join(d, sub), exist_ok=True)
+    return d
+
+
 # ── EnvironmentFile por instancia ──────────────────────────────
 def write_instance_env(slug, db_name, port, tenant_id):
     """Escribe los overrides de runtime, preservando integraciones y secreto."""
@@ -112,6 +130,7 @@ def write_instance_env(slug, db_name, port, tenant_id):
     env['DEFAULT_TENANT_ID'] = str(tenant_id)
     env['DEFAULT_TENANT_SLUG'] = slug
     env['CYBERSHOP_API_ENABLED'] = '1'
+    env['INSTANCE_OVERRIDES_DIR'] = ensure_overrides_dir(slug)
     env.setdefault('FLASK_SECRET_KEY', secrets.token_hex(32))
     ints._write_env(slug, env)
 
@@ -133,10 +152,18 @@ def enable_service(slug):
     return 'enabled'
 
 
+def service_unit(slug):
+    """Unidad systemd de la instancia. El tenant primario (sitio principal) corre
+    en el servicio `cybershop`; el resto en la plantilla `cybershop@<slug>`."""
+    if slug == Config.PRIMARY_TENANT_SLUG:
+        return 'cybershop'
+    return f'cybershop@{slug}'
+
+
 def restart_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + [SYSTEMCTL, 'restart', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'restart', service_unit(slug)])
     return 'restarted'
 
 
@@ -158,6 +185,30 @@ def remove_site(domain):
     return proxy_service.remove_site(domain)
 
 
+def _issue_ssl_bg(domains):
+    """Emite certificados en segundo plano (no bloquea la creación)."""
+    for dom in domains:
+        try:
+            proxy_service.issue_ssl(dom)
+        except Exception:
+            pass
+
+
+def issue_ssl_async(domains):
+    """Lanza la emisión de SSL en un hilo daemon. Devuelve de inmediato.
+
+    certbot puede tardar decenas de segundos (DNS / Let's Encrypt) y, si corre
+    dentro del request de crear cliente, supera el proxy_read_timeout del nginx
+    del maestro (60s) → el operador ve un 504 aunque el cliente sí se creó.
+    El sitio queda accesible por HTTP al instante y pasa a HTTPS cuando el cert
+    quede listo (reintentable con "Reaprovisionar").
+    """
+    doms = [d for d in (domains or []) if d]
+    if not doms:
+        return
+    threading.Thread(target=_issue_ssl_bg, args=(doms,), daemon=True).start()
+
+
 # ── Orquestador ────────────────────────────────────────────────
 def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
     """Asigna puerto, escribe env, registra runtime y (en Linux) levanta la
@@ -176,11 +227,12 @@ def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
         if custom_domain:
             write_site(custom_domain, port, is_subdomain=False)
         status = 'running'
-        # SSL automatico: el dominio queda publicado en HTTPS sin pasos manuales.
-        # (Requiere que el DNS ya apunte al servidor; si no, certbot falla y el
-        # mensaje queda visible en el panel para reintentar con Reaprovisionar.)
-        for dom in {domain_for(subdomain), custom_domain} - {None}:
-            ssl_msgs.append(proxy_service.issue_ssl(dom))
+        # SSL en SEGUNDO PLANO: no bloquea el request de creación (evita el 504
+        # del nginx del maestro). El sitio sirve por HTTP de inmediato y pasa a
+        # HTTPS cuando certbot termina. Ver issue_ssl_async().
+        doms = list({domain_for(subdomain), custom_domain} - {None})
+        issue_ssl_async(doms)
+        ssl_msgs.append('ssl: emitiéndose en segundo plano (%s)' % ', '.join(doms))
 
     register_runtime(tenant_id, port, subdomain, custom_domain, status=status)
     return {

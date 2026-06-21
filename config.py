@@ -81,6 +81,10 @@ class Config:
     CERTBOT_EMAIL = os.getenv('CERTBOT_EMAIL', 'cybershop.digitalsales@gmail.com')
     SERVER_IP = os.getenv('SERVER_IP', '38.134.148.47')          # IP a la que apuntar el DNS
     APP_DIR = os.getenv('APP_DIR', '/var/www/CyberShop')          # código compartido (prod)
+    # Tenant primario (sitio principal): corre en el servicio `cybershop`, NO en
+    # la plantilla `cybershop@<slug>`. Para que el restart del panel apunte al
+    # servicio correcto y sus integraciones se apliquen en vivo.
+    PRIMARY_TENANT_SLUG = os.getenv('PRIMARY_TENANT_SLUG', 'cyber-t001')
     PORT_MIN = int(os.getenv('PORT_MIN', '8100'))
     PORT_MAX = int(os.getenv('PORT_MAX', '8999'))
     BACKUP_DIR = os.getenv('BACKUP_DIR', '/var/backups/cybershop')

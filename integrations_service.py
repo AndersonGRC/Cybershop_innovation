@@ -7,9 +7,29 @@ El maestro las administra editando ese archivo (secretos enmascarados) y luego
 reinicia la instancia. NO toca `CyberShop/app/`.
 """
 
+import json
+import urllib.request
 from pathlib import Path
 
 from config import Config
+
+
+def fetch_ai_models(base_url: str, timeout: float = 4.0) -> list:
+    """Lista los modelos disponibles en el servidor Ollama del tenant (/api/tags).
+
+    Tolerante: si no hay URL, la PC está apagada o falla la red, devuelve [] y el
+    campo Modelo se queda como texto libre (no rompe la página).
+    """
+    base_url = (base_url or '').strip().rstrip('/')
+    if not base_url:
+        return []
+    try:
+        with urllib.request.urlopen(f"{base_url}/api/tags", timeout=timeout) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        names = [m.get('name') for m in data.get('models', []) if m.get('name')]
+        return sorted(names)
+    except Exception:
+        return []
 
 
 # (key, label, secret?, type, options) — type: 'text' | 'select'
@@ -98,11 +118,21 @@ def _mask(value: str) -> str:
 def get_integrations(slug: str) -> list:
     """Estructura por grupos con valores actuales; secretos enmascarados."""
     env = read_env(slug)
+    ai_models = None  # se consulta una sola vez, perezosamente
     out = []
     for group, fields in GROUPS:
         items = []
         for key, label, secret, ftype, options in fields:
             raw = env.get(key, '')
+            # Modelo IA → desplegable con los modelos reales del Ollama del tenant.
+            if key == 'AI_MODEL':
+                if ai_models is None:
+                    ai_models = fetch_ai_models(env.get('AI_BASE_URL', ''))
+                if ai_models:
+                    ftype = 'select'
+                    options = list(ai_models)
+                    if raw and raw not in options:   # no perder el valor actual
+                        options = [raw] + options
             items.append({
                 'key': key, 'label': label, 'secret': secret, 'type': ftype,
                 'options': options,

@@ -10,6 +10,7 @@ import api_key_service
 import client_config_service as ccs
 import module_service as ms
 import integrations_service as ints
+import billing_service
 from tenant_service import TenantCreationError
 
 
@@ -34,20 +35,42 @@ def nuevo():
     if request.method == 'POST':
         slug = request.form.get('slug', '')
         nombre = request.form.get('nombre', '')
+        admin_email = request.form.get('admin_email', '')
+        admin_nombre = request.form.get('admin_nombre', '')
+        plan = request.form.get('plan', 'estandar')
+        telefono = request.form.get('empresa_telefono', '')
+        whatsapp = request.form.get('empresa_whatsapp', '')
+        form = {'slug': slug, 'nombre': nombre, 'admin_email': admin_email,
+                'admin_nombre': admin_nombre, 'plan': plan,
+                'empresa_telefono': telefono, 'empresa_whatsapp': whatsapp}
         try:
-            result = tenant_service.create_tenant(slug=slug, nombre=nombre)
+            result = tenant_service.create_tenant(
+                slug=slug, nombre=nombre, admin_email=admin_email,
+                admin_nombre=admin_nombre, plan=plan,
+            )
         except TenantCreationError as exc:
             flash(str(exc), 'error')
-            return render_template(
-                'tenant_new.html',
-                form={'slug': slug, 'nombre': nombre},
-            )
+            return render_template('tenant_new.html', form=form, plans=ms.PLANS)
+
+        # Datos de contacto opcionales en la BD del cliente (no aborta si falla).
+        try:
+            ccs.set_values(result['tenant_id'], {
+                'empresa_telefono': telefono,
+                'empresa_whatsapp': whatsapp,
+            })
+        except Exception as exc:  # noqa: BLE001
+            flash(f'Tenant creado, pero no se pudieron guardar los datos de contacto: {exc}', 'warning')
 
         # Stash credenciales en sesión flash (UNA SOLA VEZ)
         session['_created_tenant'] = result
         return redirect(url_for('tenants.created', tenant_id=result['tenant_id']))
 
-    return render_template('tenant_new.html', form={'slug': '', 'nombre': ''})
+    return render_template(
+        'tenant_new.html',
+        form={'slug': '', 'nombre': '', 'admin_email': '', 'admin_nombre': '',
+              'plan': 'estandar', 'empresa_telefono': '', 'empresa_whatsapp': ''},
+        plans=ms.PLANS,
+    )
 
 
 @bp.route('/<int:tenant_id>/created')
@@ -122,6 +145,12 @@ def detail(tenant_id):
     except Exception:  # noqa: BLE001
         runtime = None
 
+    # Cobros / mora del cliente
+    try:
+        billing = billing_service.get_billing(tenant_id)
+    except Exception:  # noqa: BLE001
+        billing = None
+
     from config import Config as _Cfg
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys,
@@ -132,6 +161,7 @@ def detail(tenant_id):
         site_fields=__import__('tenant_site_fields').SITE_FIELDS,
         site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
+        billing=billing,
     )
 
 
@@ -147,6 +177,84 @@ def integraciones_save(tenant_id):
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando integraciones: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
+
+
+# ── Cobros / mora ────────────────────────────────────────────────
+
+def _por():
+    return session.get('admin_email') or session.get('admin') or 'maestro'
+
+
+@bp.route('/<int:tenant_id>/billing/config', methods=['POST'])
+@login_required
+def billing_config(tenant_id):
+    if not tenant_service.get_tenant(tenant_id):
+        abort(404)
+    try:
+        billing_service.set_config(
+            tenant_id,
+            monto_mensual=request.form.get('monto_mensual'),
+            proxima_fecha=request.form.get('proxima_fecha'),
+            auto_suspender=('auto_suspender' in request.form),
+            notas=request.form.get('notas'),
+        )
+        flash('Configuración de cobro guardada.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error guardando cobro: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
+
+
+@bp.route('/<int:tenant_id>/billing/pago', methods=['POST'])
+@login_required
+def billing_pago(tenant_id):
+    if not tenant_service.get_tenant(tenant_id):
+        abort(404)
+    try:
+        nueva = billing_service.registrar_pago(
+            tenant_id,
+            monto=request.form.get('monto'),
+            fecha=request.form.get('fecha'),
+            metodo=request.form.get('metodo'),
+            nota=request.form.get('nota'),
+            registrado_por=_por(),
+        )
+        flash(f'Pago registrado. Próximo vencimiento: {nueva}.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error registrando pago: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
+
+
+@bp.route('/<int:tenant_id>/billing/plazo', methods=['POST'])
+@login_required
+def billing_plazo(tenant_id):
+    if not tenant_service.get_tenant(tenant_id):
+        abort(404)
+    try:
+        destino = billing_service.extender_plazo(
+            tenant_id,
+            dias=request.form.get('dias') or None,
+            nueva_fecha=request.form.get('nueva_fecha') or None,
+        )
+        flash(f'Plazo extendido. Nuevo vencimiento: {destino}.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error extendiendo plazo: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
+
+
+@bp.route('/billing/revisar-morosos', methods=['POST'])
+@login_required
+def billing_revisar_morosos():
+    try:
+        suspendidos = billing_service.revisar_y_suspender(por='manual')
+        if suspendidos:
+            flash('Suspendidos por mora (+%d días): %s' % (
+                billing_service.MORA_DIAS_SUSPENSION,
+                ', '.join('%s (#%d)' % (m['slug'], m['id']) for m in suspendidos)), 'warning')
+        else:
+            flash('No hay morosos elegibles para suspender.', 'info')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error revisando morosos: {exc}', 'error')
+    return redirect(url_for('tenants.lista'))
 
 
 @bp.route('/<int:tenant_id>/config', methods=['POST'])
@@ -330,6 +438,23 @@ def instancia_accion(tenant_id):
             import tenant_migrations as tm
             applied = tm.migrate_db(tenant['db_name'])
             flash(f"Migración de BD: {len(applied)} aplicada(s)." if applied else "BD al día (nada que migrar).", 'success')
+        elif accion == 'update':
+            # "Actualizar a última versión": pone al cliente al día con lo
+            # FUNCIONAL sin tocar su sitio público.
+            #   1) migrar estructura de su BD (aditivo, idempotente — no toca
+            #      cliente_config / public_site_settings / config_secciones, que
+            #      son los datos propios del sitio de cada cliente);
+            #   2) reiniciar su instancia para que tome el CÓDIGO compartido más
+            #      reciente (ya desplegado en APP_DIR).
+            import tenant_migrations as tm
+            applied = tm.migrate_db(tenant['db_name'])
+            reinicio = prov.restart_service(tenant['slug'])
+            partes = []
+            partes.append(f"{len(applied)} migración(es) aplicada(s)" if applied else "estructura ya al día")
+            partes.append("instancia reiniciada con el código más reciente"
+                          if prov.IS_LINUX else "reinicio omitido (dev)")
+            flash("Cliente actualizado a la última versión: " + "; ".join(partes)
+                  + ". Su sitio público (colores, secciones, datos de empresa) quedó intacto.", 'success')
         else:
             flash('Acción no reconocida.', 'warning')
     except Exception as exc:  # noqa: BLE001
