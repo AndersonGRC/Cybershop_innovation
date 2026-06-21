@@ -23,24 +23,77 @@
         </label>
 
         <label for="nombre">
-            Nombre legible
+            Nombre del negocio
             <input type="text" id="nombre" name="nombre" required
                    value="{{ form.nombre }}" maxlength="100"
                    placeholder="ej. Panadería Roma">
-            <small>El nombre que se muestra al admin (se puede cambiar después).</small>
+            <small>El nombre que se muestra en su sitio y en el panel (se puede cambiar después).</small>
         </label>
+
+        <label for="admin_email">
+            Email del dueño / administrador
+            <input type="email" id="admin_email" name="admin_email" required
+                   value="{{ form.admin_email }}" maxlength="120"
+                   placeholder="ej. dueno@panaderiaroma.com">
+            <small>
+                Con este correo se crea el usuario administrador del cliente
+                (rol propietario) y queda como email de contacto de su empresa.
+                Es <strong>obligatorio y real</strong>: ahí inicia sesión el dueño.
+            </small>
+        </label>
+
+        <label for="admin_nombre">
+            Nombre del administrador <span style="font-weight:normal">(opcional)</span>
+            <input type="text" id="admin_nombre" name="admin_nombre"
+                   value="{{ form.admin_nombre }}" maxlength="100"
+                   placeholder="ej. María Pérez">
+            <small>Nombre que verá el dueño en su perfil. Si lo dejas vacío, queda "Administrador".</small>
+        </label>
+
+        <label for="plan">
+            Plan contratado
+            <select id="plan" name="plan" required>
+                {% for p in plans %}
+                <option value="{{ p }}" {% if form.plan == p %}selected{% endif %}>{{ p|capitalize }}</option>
+                {% endfor %}
+            </select>
+            <small>
+                Define qué módulos nacen activos (ej. <em>ultra</em> incluye el
+                Asistente IA). Se puede cambiar luego en la pestaña Módulos.
+            </small>
+        </label>
+
+        <div class="grid">
+            <label for="empresa_telefono">
+                Teléfono <span style="font-weight:normal">(opcional)</span>
+                <input type="text" id="empresa_telefono" name="empresa_telefono"
+                       value="{{ form.empresa_telefono }}" maxlength="40"
+                       placeholder="ej. (601) 123 4567">
+            </label>
+            <label for="empresa_whatsapp">
+                WhatsApp <span style="font-weight:normal">(opcional)</span>
+                <input type="text" id="empresa_whatsapp" name="empresa_whatsapp"
+                       value="{{ form.empresa_whatsapp }}" maxlength="40"
+                       placeholder="ej. 573001234567">
+            </label>
+        </div>
 
         <details>
             <summary>¿Qué hace este botón exactamente?</summary>
             <ol>
                 <li>Valida que el slug sea único.</li>
-                <li>Computa el nombre de BD (<code>cyber_tNNN</code>).</li>
-                <li><code>CREATE DATABASE cyber_tNNN</code> en Postgres.</li>
+                <li>Computa el nombre de BD (<code>cyber_tNNN</code>) y hace <code>CREATE DATABASE</code>.</li>
                 <li>Aplica el schema base (productos, usuarios, pedidos, etc.).</li>
-                <li>Inserta filas en <code>tenants</code> y <code>tenant_databases</code>.</li>
-                <li>Emite la primera API key + client code para el cliente.</li>
+                <li><strong>Siembra los datos del cliente</strong>: usuario administrador con el
+                    email del dueño + contraseña temporal, nombre de la empresa, colores de
+                    marca, secciones del sitio y datos de contacto.</li>
+                <li>Registra el cliente en el control plane con el <strong>plan elegido</strong>
+                    y activa los módulos que incluye ese plan.</li>
+                <li>Emite la primera API key + client code.</li>
+                <li>Aprovisiona la instancia (puerto, dominio <code>slug.cybershopcol.com</code> y SSL).</li>
             </ol>
-            <p><strong>Tarda 2-5 segundos.</strong> Al terminar te mostramos la API key UNA SOLA VEZ — copiala y guardala en lugar seguro.</p>
+            <p><strong>Tarda 2-5 segundos.</strong> Al terminar te mostramos la API key y la
+               contraseña del administrador UNA SOLA VEZ — copialas y guardalas en lugar seguro.</p>
         </details>
 
         <div class="grid">

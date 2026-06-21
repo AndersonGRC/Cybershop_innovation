@@ -80,6 +80,7 @@
             <tr><td><strong>Tenant ID</strong></td><td>{{ info.tenant_id }}</td></tr>
             <tr><td><strong>Slug</strong></td><td><code>{{ info.slug }}</code></td></tr>
             <tr><td><strong>Nombre</strong></td><td>{{ info.nombre }}</td></tr>
+            <tr><td><strong>Plan</strong></td><td>{{ info.plan|capitalize if info.plan else '—' }}</td></tr>
             <tr><td><strong>DB name</strong></td><td><code>{{ info.db_name }}</code></td></tr>
             <tr><td><strong>Dominio</strong></td><td><code>{{ info.domain or '—' }}</code></td></tr>
             <tr><td><strong>Puerto</strong></td><td>{{ info.port or '—' }}</td></tr>

@@ -13,6 +13,10 @@
                placeholder="Buscar por slug o nombre...">
     </form>
     <div style="text-align: right;">
+        <form method="post" action="{{ url_for('tenants.billing_revisar_morosos') }}" style="display:inline;margin:0;"
+              onsubmit="return confirm('Suspender a los clientes con +60 días de mora (excepto los excluidos). ¿Continuar?');">
+            <button type="submit" class="secondary outline">Revisar morosos</button>
+        </form>
         <a role="button" href="{{ url_for('tenants.nuevo') }}">+ Nuevo cliente</a>
     </div>
 </div>

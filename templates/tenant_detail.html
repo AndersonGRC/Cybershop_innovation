@@ -38,6 +38,7 @@
 <!-- ===== Tabs ===== -->
 <div class="tabbar" role="tablist">
     <button class="tab is-active" data-tab="config">Configuración</button>
+    <button class="tab" data-tab="cobros">Cobros{% if billing and billing.en_mora %} ⚠{% endif %}</button>
     <button class="tab" data-tab="secciones">Secciones</button>
     <button class="tab" data-tab="modulos">Módulos</button>
     <button class="tab" data-tab="integraciones">Integraciones</button>
@@ -277,6 +278,103 @@
 </section>
 
 <!-- ===== Tab: Técnico ===== -->
+<!-- ===== Tab: Cobros ===== -->
+<section class="tabpanel" id="tab-cobros">
+    {% if billing %}
+    <article class="card">
+        <h3>Estado de cobro</h3>
+        {% if billing.estado == 'sin_config' %}
+        <p><span class="badge badge-muted">Sin configurar</span> — define el monto y el próximo vencimiento abajo para empezar a controlar el cobro.</p>
+        {% elif billing.estado == 'al_dia' %}
+        <p><span class="badge badge-success">✓ Al día</span> — próximo vencimiento <strong>{{ billing.proxima_fecha }}</strong> (en {{ billing.dias }} días).</p>
+        {% else %}
+        <p><mark style="background:#fde8e8;color:#b42318;font-weight:700;">● EN MORA</mark> —
+           venció el <strong>{{ billing.proxima_fecha }}</strong>, <strong>{{ billing.dias }} días</strong> de atraso.
+           {% if billing.auto_suspender %}
+             {% if billing.a_suspension and billing.a_suspension > 0 %}Se auto-suspende en <strong>{{ billing.a_suspension }}</strong> días (umbral {{ billing.umbral_suspension }}d).
+             {% else %}<strong>Ya superó el umbral de {{ billing.umbral_suspension }}d</strong> — se suspenderá en la próxima revisión.{% endif %}
+           {% else %}<em>(Auto-suspensión desactivada para este tenant.)</em>{% endif %}
+        </p>
+        {% endif %}
+        <table>
+            <tr><td>Monto mensual</td><td><strong>${{ '{:,.0f}'.format(billing.monto_mensual) }}</strong></td></tr>
+            <tr><td>Próximo vencimiento</td><td>{{ billing.proxima_fecha or '—' }}</td></tr>
+            <tr><td>Auto-suspensión por mora</td><td>{{ 'Sí (a los %d días)'|format(billing.umbral_suspension) if billing.auto_suspender else 'No — excluido' }}</td></tr>
+            {% if billing.ultimo_pago %}<tr><td>Último pago</td><td>${{ '{:,.0f}'.format(billing.ultimo_pago.monto) }} el {{ billing.ultimo_pago.fecha }} ({{ billing.ultimo_pago.metodo or '—' }})</td></tr>{% endif %}
+        </table>
+    </article>
+
+    <div class="grid-2">
+        <article class="card">
+            <h3>Registrar pago</h3>
+            <form method="post" action="{{ url_for('tenants.billing_pago', tenant_id=tenant.id) }}">
+                <label>Monto <input type="text" name="monto" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}" required></label>
+                <label>Fecha del pago <input type="date" name="fecha"></label>
+                <label>Método
+                    <select name="metodo">
+                        <option value="transferencia">Transferencia</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="web/PayU">Web / PayU</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </label>
+                <label>Nota <input type="text" name="nota" placeholder="opcional"></label>
+                <button type="submit">Registrar pago (+1 mes)</button>
+                <small class="muted">Avanza el vencimiento un mes y reactiva si estaba suspendido por mora.</small>
+            </form>
+        </article>
+
+        <article class="card">
+            <h3>Dar más plazo</h3>
+            <form method="post" action="{{ url_for('tenants.billing_plazo', tenant_id=tenant.id) }}">
+                <label>Sumar días <input type="number" name="dias" min="1" placeholder="ej. 15"></label>
+                <label>…o fecha exacta <input type="date" name="nueva_fecha"></label>
+                <button type="submit" class="secondary">Extender vencimiento</button>
+                <small class="muted">Empuja el vencimiento sin registrar un pago.</small>
+            </form>
+        </article>
+    </div>
+
+    <article class="card">
+        <h3>Configuración de cobro</h3>
+        <form method="post" action="{{ url_for('tenants.billing_config', tenant_id=tenant.id) }}">
+            <div class="grid-2">
+                <label>Monto mensual <input type="text" name="monto_mensual" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}"></label>
+                <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}"></label>
+            </div>
+            <label><input type="checkbox" name="auto_suspender" {% if billing.auto_suspender %}checked{% endif %}> Auto-suspender tras {{ billing.umbral_suspension }} días de mora</label>
+            <label>Notas <input type="text" name="notas" value="{{ billing.notas }}"></label>
+            <button type="submit">Guardar configuración</button>
+        </form>
+    </article>
+
+    {% if billing.historial %}
+    <article class="card">
+        <h3>Historial de pagos <small class="muted">({{ billing.historial|length }})</small></h3>
+        <figure>
+        <table>
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th>Cubre hasta</th><th>Nota</th><th>Por</th></tr></thead>
+            <tbody>
+                {% for p in billing.historial %}
+                <tr>
+                    <td>{{ p.fecha }}</td>
+                    <td>${{ '{:,.0f}'.format(p.monto) }}</td>
+                    <td>{{ p.metodo or '—' }}</td>
+                    <td>{{ p.cubre_hasta or '—' }}</td>
+                    <td>{{ p.nota or '' }}</td>
+                    <td><small>{{ p.registrado_por or '' }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </figure>
+    </article>
+    {% endif %}
+    {% else %}
+    <article class="card"><p>No se pudo cargar la información de cobro de este cliente.</p></article>
+    {% endif %}
+</section>
+
 <section class="tabpanel" id="tab-tecnico">
     {% set estado_es = {'pending':'pendiente','running':'activa','stopped':'detenida','cancelled':'cancelada'} %}
     <article class="card">
@@ -327,18 +425,29 @@
         </details>
         {% endif %}
 
-        <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap;">
+        <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap; align-items:center;">
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
+                  onsubmit="return confirm('Actualiza este cliente a la última versión FUNCIONAL (estructura de BD + código). NO toca su sitio público (colores, secciones, datos de empresa). ¿Continuar?')">
+                <input type="hidden" name="accion" value="update">
+                <button class="btn-small" type="submit">⬆ Actualizar a última versión</button>
+            </form>
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
                 <input type="hidden" name="accion" value="restart"><button class="secondary outline btn-small" type="submit">Reiniciar instancia</button>
             </form>
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
                   onsubmit="return confirm('Aplica migraciones aditivas a la BD de este cliente. ¿Continuar?')">
-                <input type="hidden" name="accion" value="migrate"><button class="secondary outline btn-small" type="submit">Migrar BD</button>
+                <input type="hidden" name="accion" value="migrate"><button class="secondary outline btn-small" type="submit">Solo migrar BD</button>
             </form>
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
                 <input type="hidden" name="accion" value="reprovision"><button class="secondary outline btn-small" type="submit">Reaprovisionar</button>
             </form>
         </div>
+        <p style="margin:.5rem 0 0;"><small class="muted">
+            <strong>Actualizar a última versión</strong>: pone al cliente al día con lo funcional
+            — migra la estructura de su BD (aditivo, no borra datos) y reinicia su instancia para
+            tomar el código compartido más reciente. <strong>No modifica su sitio público</strong>
+            (colores, secciones ni datos de empresa son propios de cada cliente).
+        </small></p>
     </article>
 
     <article class="card">
