@@ -441,6 +441,15 @@
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
                 <input type="hidden" name="accion" value="reprovision"><button class="secondary outline btn-small" type="submit">Reaprovisionar</button>
             </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
+                <input type="hidden" name="accion" value="sync_status"><button class="secondary outline btn-small" type="submit">Sincronizar estado</button>
+            </form>
+            {% if tenant.slug == primary_slug %}
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
+                  onsubmit="return confirm('Detiene y deshabilita el unit fantasma cybershop@{{ tenant.slug }} (crash-loop). NO toca el sitio principal (cybershop.service). ¿Continuar?')">
+                <input type="hidden" name="accion" value="repair"><button class="secondary outline btn-small" type="submit">🛠 Reparar instancia</button>
+            </form>
+            {% endif %}
         </div>
         <p style="margin:.5rem 0 0;"><small class="muted">
             <strong>Actualizar a última versión</strong>: pone al cliente al día con lo funcional
