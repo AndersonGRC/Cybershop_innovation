@@ -157,28 +157,16 @@ def validate_slug(slug: str) -> str:
     return slug
 
 
-def compute_db_name(slug: str) -> str:
-    """Decide el db_name para un slug nuevo.
+def compute_db_name(tenant_id: int) -> str:
+    """db_name determinístico a partir del tenant_id: `cyber_t<ID>` (mín. 3 díg.).
 
-    - Si el slug calza el patrón cyber-tNNN, usa cyber_tNNN.
-    - Si no, busca el siguiente cyber_tNNN disponible (auto-incremental).
+    Derivar del id del control plane (y NO de un contador propio ni del slug)
+    elimina la colisión histórica donde el slug 'cyber-t001' no correspondía a la
+    DB 'cyber_t001' (esa pertenecía a otro tenant). Como el id es único y la fila
+    `tenants` se reserva antes de crear la DB, el nombre nunca colisiona entre
+    clientes nuevos.
     """
-    m = re.match(r'^cyber-t(\d{3,5})$', slug)
-    if m:
-        return f"cyber_t{int(m.group(1)):03d}"
-
-    with control_plane_cursor(dict_cursor=True) as cur:
-        cur.execute("""
-            SELECT db_name FROM tenant_databases
-            WHERE db_name ~ '^cyber_t[0-9]{3,5}$'
-            ORDER BY db_name DESC LIMIT 1
-        """)
-        row = cur.fetchone()
-
-    if not row:
-        return 'cyber_t001'
-    last = int(row['db_name'].replace('cyber_t', ''))
-    return f'cyber_t{last + 1:03d}'
+    return f"cyber_t{int(tenant_id):03d}"
 
 
 def _slug_exists(slug: str) -> bool:
@@ -289,17 +277,23 @@ def _apply_seed(db_name: str, nombre: str, admin_email: str, slug: str = 'princi
     return seed
 
 
-def _insert_tenant_rows(slug: str, nombre: str, db_name: str, plan: str = 'estandar') -> int:
-    """INSERT en tenants + tenant_databases. Devuelve tenant_id."""
-    db_password_enc = aes_gcm_encrypt(Config.PG_PASSWORD)
+def _insert_tenant_row(slug: str, nombre: str, plan: str = 'estandar') -> int:
+    """Reserva la fila en `tenants` y devuelve el id (para derivar el db_name).
 
+    Se hace ANTES de crear la DB: así el nombre de la DB queda atado al id y, si
+    algo falla después, _rollback_partial_tenant() borra esta fila."""
     with control_plane_cursor(dict_cursor=True) as cur:
         cur.execute(
             "INSERT INTO tenants (slug, nombre, plan) VALUES (%s, %s, %s) RETURNING id",
             (slug, nombre, plan)
         )
-        tenant_id = cur.fetchone()['id']
+        return cur.fetchone()['id']
 
+
+def _insert_tenant_db_row(tenant_id: int, db_name: str):
+    """Registra la DB del tenant en el control plane (password Postgres cifrada)."""
+    db_password_enc = aes_gcm_encrypt(Config.PG_PASSWORD)
+    with control_plane_cursor() as cur:
         cur.execute(
             """
             INSERT INTO tenant_databases
@@ -316,7 +310,30 @@ def _insert_tenant_rows(slug: str, nombre: str, db_name: str, plan: str = 'estan
             )
         )
 
-    return tenant_id
+
+def _rollback_partial_tenant(tenant_id: int | None, db_name: str | None, drop_db: bool):
+    """Compensa una creación fallida: dropea la DB (solo si la creamos en este
+    intento) y borra las filas parciales del control plane. Best-effort: nunca
+    enmascara el error original (todo en try/except silencioso).
+
+    Las FK de tenant_databases/tenant_runtime/usuarios_globales NO tienen ON
+    DELETE CASCADE, por eso se borran explícitamente antes que `tenants`.
+    """
+    if drop_db and db_name:
+        try:
+            import lifecycle_service  # import diferido: lifecycle importa este módulo
+            lifecycle_service.destroy_database(db_name)
+        except Exception:  # noqa: BLE001
+            pass
+    if tenant_id:
+        try:
+            with control_plane_cursor() as cur:
+                cur.execute("DELETE FROM tenant_databases WHERE tenant_id = %s", (tenant_id,))
+                cur.execute("DELETE FROM tenant_runtime   WHERE tenant_id = %s", (tenant_id,))
+                cur.execute("DELETE FROM sync_api_keys     WHERE tenant_id = %s", (tenant_id,))
+                cur.execute("DELETE FROM tenants           WHERE id = %s", (tenant_id,))
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
@@ -324,21 +341,21 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
                   plan: str = 'estandar') -> dict:
     """Orquesta la creación end-to-end de un tenant nuevo.
 
-    Pasos:
-      1. Validar slug y nombre.
-      2. Computar db_name único.
-      3. Verificar que ni el slug ni la DB existan.
-      4. CREATE DATABASE cyber_tNNN.
-      5. Aplicar schema base con psql.
-      6. Seed mínimo (roles, admin, colores, secciones).
-      7. INSERT en tenants + tenant_databases.
-      8. Emitir primera API key + client_code.
+    Pasos (atómicos: si algo falla se revierte solo, sin BD huérfana):
+      1. Validar slug/nombre/plan; verificar que el slug no exista.
+      2. Reservar la fila `tenants` → obtener id.
+      3. db_name = cyber_t<id> (determinístico, NO contador).
+      4. CREATE DATABASE + schema (psql) + seed (roles, admin, colores, secciones).
+      5. INSERT en tenant_databases.
+      6. Activar módulos del plan (no aborta; se reporta como aviso).
+      7. Emitir primera API key + client_code.
+      8. Aprovisionar instancia + dominio (no aborta; reaprovisionable).
 
-    Returns dict con todo lo necesario para mostrarle al admin:
+    Returns dict para mostrarle al admin (incluye 'warnings'):
       {tenant_id, slug, db_name, api_key, client_code, key_prefix,
-       admin_email, admin_password}
+       admin_email, admin_password, port, domain, instance_status, warnings}
 
-    Si algo falla, levanta TenantCreationError con mensaje específico.
+    Si un paso crítico (2-5, 7) falla, levanta TenantCreationError tras revertir.
     """
     nombre = (nombre or '').strip()
     if not nombre or len(nombre) > 100:
@@ -348,83 +365,74 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
     admin_email = (admin_email or '').strip().lower() or f'admin@{slug}.local'
     admin_nombre = (admin_nombre or '').strip() or 'Administrador'
 
-    # Validar plan contra el catálogo de módulos (default estandar si no calza).
+    # Validar plan contra el catálogo de módulos (acepta alias legacy, default estandar).
     import module_service as _ms
-    plan = (plan or '').strip().lower()
-    if plan not in _ms.PLANS:
-        plan = 'estandar'
+    plan = _ms.normalize_plan(plan)
 
     if _slug_exists(slug):
         raise TenantCreationError(f"Ya existe un tenant con slug '{slug}'.")
 
-    db_name = compute_db_name(slug)
+    warnings = []
 
-    if _db_exists(db_name):
-        raise TenantCreationError(
-            f"Ya existe una base de datos '{db_name}' en Postgres. "
-            "Borrala manualmente o elegí otro slug."
-        )
-
-    # Paso 4: crear DB
+    # Paso 1: reservar la fila `tenants` para obtener el id (db_name determinístico).
     try:
-        _create_database(db_name)
+        tenant_id = _insert_tenant_row(slug, nombre, plan)
     except Exception as exc:  # noqa: BLE001
-        raise TenantCreationError(f"CREATE DATABASE {db_name} falló: {exc}") from exc
+        msg = str(exc).lower()
+        if 'unique' in msg or 'duplicate' in msg:
+            raise TenantCreationError(f"Ya existe un tenant con slug '{slug}'.") from exc
+        raise TenantCreationError(f"No se pudo registrar el tenant: {exc}") from exc
 
-    # Paso 5: aplicar schema
+    db_name = compute_db_name(tenant_id)
+    created_db = False
+
+    # Pasos 2-5 (DB + schema + seed + registro de la DB): ATÓMICOS por compensación.
+    # Si algo falla, _rollback_partial_tenant() dropea la DB (si la creamos) y borra
+    # las filas parciales → no quedan huérfanas ni el operador limpia a mano.
     try:
-        _apply_schema(db_name)
+        if _db_exists(db_name):
+            raise TenantCreationError(
+                f"Ya existe una base de datos '{db_name}' (residuo de un intento "
+                f"anterior del id {tenant_id}). Elimínala antes de reintentar."
+            )
+
+        _create_database(db_name)            # Paso 2: CREATE DATABASE
+        created_db = True
+        _apply_schema(db_name)               # Paso 3: schema base
+        seed = _apply_seed(db_name, nombre, admin_email, slug=slug,
+                           admin_nombre=admin_nombre)   # Paso 4: seed
+        _insert_tenant_db_row(tenant_id, db_name)       # Paso 5: registrar DB
     except TenantCreationError:
-        # Schema falló — la DB queda vacía. Reportar pero NO borrar (audit).
+        _rollback_partial_tenant(tenant_id, db_name, drop_db=created_db)
         raise
     except Exception as exc:  # noqa: BLE001
+        _rollback_partial_tenant(tenant_id, db_name, drop_db=created_db)
         raise TenantCreationError(
-            f"Schema base falló en {db_name}: {exc}\n"
-            f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
+            f"Creación de {db_name} falló y se revirtió automáticamente: {exc}"
         ) from exc
 
-    # Paso 6: seed mínimo (roles, admin, colores, secciones)
-    try:
-        seed = _apply_seed(db_name, nombre, admin_email, slug=slug, admin_nombre=admin_nombre)
-    except Exception as exc:  # noqa: BLE001
-        raise TenantCreationError(
-            f"Seed inicial falló en {db_name}: {exc}\n"
-            f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
-        ) from exc
-
-    # Paso 7: registrar en control plane (con el plan elegido)
-    try:
-        tenant_id = _insert_tenant_rows(slug, nombre, db_name, plan=plan)
-    except Exception as exc:  # noqa: BLE001
-        raise TenantCreationError(
-            f"INSERT en tenants/tenant_databases falló: {exc}\n"
-            f"BD huérfana — borrala manualmente: DROP DATABASE {db_name};"
-        ) from exc
-
-    # Paso 7b: activar los módulos que incluye el plan (escribe en la BD del
-    # tenant; no aborta la creación si falla — los módulos se pueden ajustar
-    # luego desde el detalle del cliente).
+    # Paso 6: activar los módulos del plan (no aborta; se reporta como aviso).
     try:
         _ms.apply_plan(tenant_id, plan)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"módulos del plan no aplicados ({exc}); ajustalos en la pestaña Módulos.")
 
-    # Paso 7: primera API key
+    # Paso 7: primera API key (crítica: si falla, revertir TODO para no dejar a medias).
     try:
         key_info = issue_key(tenant_id, label=key_label)
     except Exception as exc:  # noqa: BLE001
+        _rollback_partial_tenant(tenant_id, db_name, drop_db=created_db)
         raise TenantCreationError(
-            f"Tenant creado pero falló emisión de primera key: {exc}\n"
-            f"Podés emitirla manualmente desde el detalle del tenant."
+            f"Falló la emisión de la primera key; la creación se revirtió: {exc}"
         ) from exc
 
-    # Paso 9: aprovisionar instancia + dominio (puerto, env, runtime; service/Caddy en Linux)
+    # Paso 8: aprovisionar instancia + dominio (no aborta; reaprovisionable desde el detalle).
     prov = {'port': None, 'domain': None, 'instance_status': 'pending'}
     try:
         prov = provisioning_service.provision(tenant_id, slug, db_name, subdomain=slug)
     except Exception as exc:  # noqa: BLE001
-        # No abortamos: el tenant ya existe; se puede reaprovisionar desde el detalle.
         prov['error'] = str(exc)
+        warnings.append(f"aprovisionamiento pendiente ({exc}); usá «Reaprovisionar» en Técnico.")
 
     return {
         'tenant_id':      tenant_id,
@@ -441,4 +449,5 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
         'port':           prov.get('port'),
         'domain':         prov.get('domain'),
         'instance_status': prov.get('instance_status'),
+        'warnings':       warnings,
     }

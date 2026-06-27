@@ -144,20 +144,23 @@ def _run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
-def enable_service(slug):
-    if not IS_LINUX:
-        return 'skipped (no-linux)'
-    _run(SUDO + [SYSTEMCTL, 'enable', f'cybershop@{slug}'])
-    _run(SUDO + [SYSTEMCTL, 'start', f'cybershop@{slug}'])
-    return 'enabled'
-
-
 def service_unit(slug):
     """Unidad systemd de la instancia. El tenant primario (sitio principal) corre
     en el servicio `cybershop`; el resto en la plantilla `cybershop@<slug>`."""
     if slug == Config.PRIMARY_TENANT_SLUG:
         return 'cybershop'
     return f'cybershop@{slug}'
+
+
+def enable_service(slug):
+    if not IS_LINUX:
+        return 'skipped (no-linux)'
+    # Usar service_unit(): para el primario es `cybershop` (NO la plantilla
+    # `cybershop@cyber-t001`, cuyo env no tiene PORT → crash-loop perpetuo).
+    unit = service_unit(slug)
+    _run(SUDO + [SYSTEMCTL, 'enable', unit])
+    _run(SUDO + [SYSTEMCTL, 'start', unit])
+    return 'enabled'
 
 
 def restart_service(slug):
@@ -170,10 +173,38 @@ def restart_service(slug):
 def stop_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + [SYSTEMCTL, 'stop', f'cybershop@{slug}'])
+    unit = service_unit(slug)
+    _run(SUDO + [SYSTEMCTL, 'stop', unit])
     # disable: un cliente suspendido NO debe auto-arrancar tras un reboot
-    _run(SUDO + [SYSTEMCTL, 'disable', f'cybershop@{slug}'])
+    _run(SUDO + [SYSTEMCTL, 'disable', unit])
     return 'stopped'
+
+
+def repair_primary_unit():
+    """Limpia el unit templated fantasma del tenant primario.
+
+    El primario corre como `cybershop.service`. Si por un reaprovisionamiento
+    viejo quedó habilitado/arrancado `cybershop@<PRIMARY>` (cuyo env no tiene
+    PORT), systemd lo reinicia en bucle indefinidamente. Esto lo detiene y
+    deshabilita SIN tocar el servicio real `cybershop`. Idempotente."""
+    if not IS_LINUX:
+        return 'skipped (no-linux)'
+    ghost = f'cybershop@{Config.PRIMARY_TENANT_SLUG}'
+    _run(SUDO + [SYSTEMCTL, 'stop', ghost])
+    _run(SUDO + [SYSTEMCTL, 'disable', ghost])
+    # reset-failed es cosmético (limpia el contador de fallos); si la regla
+    # sudoers no lo permite, stop+disable ya frenan el bucle.
+    _run(SUDO + [SYSTEMCTL, 'reset-failed', ghost])
+    return f'unit fantasma {ghost} detenido y deshabilitado'
+
+
+def service_is_active(slug) -> bool:
+    """True si la unidad systemd de la instancia está 'active'. No requiere sudo
+    (is-active es consulta no privilegiada)."""
+    if not IS_LINUX:
+        return False
+    r = _run([SYSTEMCTL, 'is-active', service_unit(slug)])
+    return (r.stdout or '').strip() == 'active'
 
 
 # Proxy (nginx por defecto, o Caddy) delegado a proxy_service.
@@ -214,6 +245,19 @@ def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
     """Asigna puerto, escribe env, registra runtime y (en Linux) levanta la
     instancia + el proxy (nginx/Caddy). Valida el dominio (seguridad).
     Devuelve {port, domain, custom_domain, instance_status}."""
+    # El tenant primario se gestiona como `cybershop.service` (puerto fijo, env y
+    # nginx propios). Reaprovisionarlo por la plantilla `cybershop@<slug>` le
+    # escribiría un env sin sentido y lo dejaría en crash-loop. No-op seguro.
+    if slug == Config.PRIMARY_TENANT_SLUG:
+        rt = get_runtime(tenant_id) or {}
+        return {
+            'port': rt.get('port'),
+            'domain': Config.BASE_DOMAIN,
+            'custom_domain': rt.get('custom_domain'),
+            'instance_status': 'running' if IS_LINUX else 'pending',
+            'ssl': 'gestionado aparte (sitio principal cybershop.service)',
+        }
+
     subdomain = proxy_service.validate_subdomain(subdomain or slug)
     custom_domain = proxy_service.validate_domain(custom_domain) if custom_domain else None
     port = allocate_port(tenant_id)

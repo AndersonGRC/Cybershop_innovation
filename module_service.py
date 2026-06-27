@@ -46,6 +46,24 @@ PLAN_MODULES = {
 }
 PLANS = list(PLAN_MODULES.keys())
 
+# Nombres de plan legacy que aún viven en la tabla `tenants` (default histórico
+# 'standard', clientes 'legacy'). Se aceptan como alias para que "Aplicar plan"
+# funcione desde el panel SIN mutar la data existente.
+PLAN_ALIASES = {
+    'standard': 'estandar',
+    'std':      'estandar',
+    'legacy':   'estandar',
+    'basic':    'basico',
+}
+
+
+def normalize_plan(plan: str) -> str:
+    """Devuelve un plan válido del catálogo. Resuelve alias legacy y normaliza
+    a minúsculas; si no calza con nada, cae a 'estandar'."""
+    p = (plan or '').strip().lower()
+    p = PLAN_ALIASES.get(p, p)
+    return p if p in PLAN_MODULES else 'estandar'
+
 
 def _as_bool(value, default):
     if value is None:
@@ -102,10 +120,13 @@ def set_module(tenant_id: int, code: str, active: bool):
 
 
 def apply_plan(tenant_id: int, plan: str):
-    """Activa/desactiva todos los módulos según los defaults del plan."""
-    enabled = PLAN_MODULES.get(plan)
-    if enabled is None:
-        raise ValueError(f"Plan desconocido: {plan}")
+    """Activa/desactiva todos los módulos según los defaults del plan.
+
+    Acepta nombres legacy (p.ej. 'standard') vía normalize_plan(), de modo que el
+    botón "Aplicar plan" del panel funcione aunque la fila `tenants` traiga el
+    nombre viejo."""
+    plan = normalize_plan(plan)
+    enabled = PLAN_MODULES[plan]
     with tenant_cursor(tenant_id) as cur:
         for code, nombre, desc, cat, ck, default in MODULES:
             _upsert_flag(cur, ck, code in enabled, desc)

@@ -61,6 +61,10 @@ def nuevo():
         except Exception as exc:  # noqa: BLE001
             flash(f'Tenant creado, pero no se pudieron guardar los datos de contacto: {exc}', 'warning')
 
+        # Avisos no críticos del aprovisionamiento (módulos/instancia pendientes).
+        for w in (result.get('warnings') or []):
+            flash(f'Aviso: {w}', 'warning')
+
         # Stash credenciales en sesión flash (UNA SOLA VEZ)
         session['_created_tenant'] = result
         return redirect(url_for('tenants.created', tenant_id=result['tenant_id']))
@@ -158,6 +162,7 @@ def detail(tenant_id):
         integraciones=integraciones, dian=dian, runtime=runtime,
         proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
         proxy_backend=_Cfg.PROXY_BACKEND,
+        primary_slug=_Cfg.PRIMARY_TENANT_SLUG,
         site_fields=__import__('tenant_site_fields').SITE_FIELDS,
         site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
@@ -431,6 +436,16 @@ def instancia_accion(tenant_id):
         if accion == 'restart':
             prov.restart_service(tenant['slug'])
             flash('Instancia reiniciada (en el servidor). En dev no aplica.', 'success')
+        elif accion == 'repair':
+            # Limpia el unit templated fantasma del primario (crash-loop). NO toca
+            # el servicio real `cybershop` que sirve el sitio principal.
+            msg = prov.repair_primary_unit()
+            flash(f'Reparación de instancia: {msg}.', 'success')
+        elif accion == 'sync_status':
+            activo = prov.service_is_active(tenant['slug'])
+            prov.set_status(tenant_id, 'running' if activo else 'stopped')
+            flash(f"Estado sincronizado con el servidor: instancia "
+                  f"{'ACTIVA' if activo else 'detenida'}.", 'success')
         elif accion == 'reprovision':
             r = prov.provision(tenant_id, tenant['slug'], tenant['db_name'], subdomain=tenant['slug'])
             flash(f"Reaprovisionado: puerto {r['port']}, dominio {r['domain']}.", 'success')
