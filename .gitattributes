@@ -1,0 +1,13 @@
+# Normaliza fin de línea: el repo se sirve en Linux. Texto siempre LF en git.
+* text=auto eol=lf
+
+# Scripts de Windows conservan CRLF
+*.bat text eol=crlf
+
+# Binarios: que git no toque saltos de línea
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
