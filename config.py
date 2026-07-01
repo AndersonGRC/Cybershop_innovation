@@ -76,6 +76,18 @@ class Config:
         str(Path(__file__).parent / 'instances'),
     )
 
+    # --- Asistente IA (Ollama) ---
+    # El servidor de IA es el MISMO equipo para todos los tenants (la PC del
+    # proveedor). Se usa como valor por defecto del campo AI_BASE_URL para que
+    # configurar un cliente sea, en la práctica, solo elegir el modelo.
+    AI_DEFAULT_BASE_URL = os.getenv('AI_DEFAULT_BASE_URL', 'http://10.200.0.3:11434')
+    # Caché de la lista de modelos por base_url: permite que el desplegable de
+    # "Modelo" siga funcionando aunque la PC de IA esté apagada al abrir el panel.
+    AI_MODELS_CACHE_FILE = os.getenv(
+        'AI_MODELS_CACHE_FILE',
+        str(Path(INSTANCE_ENV_DIR) / '.ai_models_cache.json'),
+    )
+
     # --- Aprovisionamiento de instancia + dominio (1C) ---
     BASE_DOMAIN = os.getenv('BASE_DOMAIN', 'cybershopcol.com')   # subdominios *.BASE_DOMAIN
     CERTBOT_EMAIL = os.getenv('CERTBOT_EMAIL', 'cybershop.digitalsales@gmail.com')

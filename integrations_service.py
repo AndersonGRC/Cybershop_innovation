@@ -15,21 +15,75 @@ from config import Config
 
 
 def fetch_ai_models(base_url: str, timeout: float = 4.0) -> list:
-    """Lista los modelos disponibles en el servidor Ollama del tenant (/api/tags).
+    """Lista los modelos del servidor de IA. Ollama nativo (/api/tags) y, como
+    respaldo, OpenAI-compatible (/v1/models).
 
-    Tolerante: si no hay URL, la PC está apagada o falla la red, devuelve [] y el
-    campo Modelo se queda como texto libre (no rompe la página).
+    Tolerante: si no hay URL, la PC está apagada o falla la red, devuelve [] (el
+    campo Modelo cae a su caché o a texto libre; nunca rompe la página).
     """
     base_url = (base_url or '').strip().rstrip('/')
     if not base_url:
         return []
-    try:
+    try:  # Ollama nativo
         with urllib.request.urlopen(f"{base_url}/api/tags", timeout=timeout) as r:
             data = json.loads(r.read().decode('utf-8'))
         names = [m.get('name') for m in data.get('models', []) if m.get('name')]
+        if names:
+            return sorted(names)
+    except Exception:
+        pass
+    try:  # OpenAI-compatible (algunos backends cloud)
+        with urllib.request.urlopen(f"{base_url}/v1/models", timeout=timeout) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        names = [m.get('id') for m in data.get('data', []) if m.get('id')]
         return sorted(names)
     except Exception:
         return []
+
+
+# ── Caché de modelos por servidor de IA (base_url) ─────────────
+# El servidor de IA suele estar apagado cuando se abre el panel. Guardamos la
+# última lista conocida por base_url para que el desplegable siga siendo útil
+# sin bloquear la carga de la página con una llamada de red.
+def _models_cache_load() -> dict:
+    try:
+        p = Path(Config.AI_MODELS_CACHE_FILE)
+        if p.is_file():
+            return json.loads(p.read_text(encoding='utf-8')) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _models_cache_save(base_url: str, names: list) -> None:
+    base_url = (base_url or '').strip().rstrip('/')
+    if not base_url or not names:
+        return
+    data = _models_cache_load()
+    if data.get(base_url) == names:
+        return
+    data[base_url] = names
+    try:
+        p = Path(Config.AI_MODELS_CACHE_FILE)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+    except Exception:
+        pass
+
+
+def models_cached(base_url: str) -> list:
+    """Última lista de modelos conocida para ese servidor (sin red)."""
+    base_url = (base_url or '').strip().rstrip('/')
+    return list(_models_cache_load().get(base_url, []))
+
+
+def refresh_ai_models(base_url: str) -> list:
+    """Consulta EN VIVO el servidor de IA y persiste la lista en caché.
+    Devuelve la lista (vacía si la PC está apagada / inalcanzable)."""
+    base_url = (base_url or '').strip().rstrip('/') or Config.AI_DEFAULT_BASE_URL
+    names = fetch_ai_models(base_url)
+    _models_cache_save(base_url, names)
+    return names
 
 
 # (key, label, secret?, type, options) — type: 'text' | 'select'
@@ -118,21 +172,24 @@ def _mask(value: str) -> str:
 def get_integrations(slug: str) -> list:
     """Estructura por grupos con valores actuales; secretos enmascarados."""
     env = read_env(slug)
-    ai_models = None  # se consulta una sola vez, perezosamente
     out = []
     for group, fields in GROUPS:
         items = []
         for key, label, secret, ftype, options in fields:
             raw = env.get(key, '')
-            # Modelo IA → desplegable con los modelos reales del Ollama del tenant.
+            # URL del servidor IA → precargar el default (mismo PC para todos) si
+            # aún no se ha configurado, para que solo haya que elegir el modelo.
+            if key == 'AI_BASE_URL' and not raw:
+                raw = Config.AI_DEFAULT_BASE_URL
+            # Modelo IA → combobox (datalist): dropdown con la ÚLTIMA lista conocida
+            # (caché, sin red → no bloquea la carga) y además permite escribir uno
+            # nuevo. El botón "Actualizar modelos" refresca en vivo por AJAX.
             if key == 'AI_MODEL':
-                if ai_models is None:
-                    ai_models = fetch_ai_models(env.get('AI_BASE_URL', ''))
-                if ai_models:
-                    ftype = 'select'
-                    options = list(ai_models)
-                    if raw and raw not in options:   # no perder el valor actual
-                        options = [raw] + options
+                base = env.get('AI_BASE_URL', '') or Config.AI_DEFAULT_BASE_URL
+                ftype = 'datalist'
+                options = models_cached(base)
+                if raw and raw not in options:   # no perder el valor actual
+                    options = [raw] + options
             items.append({
                 'key': key, 'label': label, 'secret': secret, 'type': ftype,
                 'options': options,

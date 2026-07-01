@@ -1,7 +1,8 @@
 """CRUD de tenants + acciones sobre sus API keys."""
 
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, flash, abort, session
+    Blueprint, render_template, request, redirect, url_for, flash, abort, session,
+    jsonify,
 )
 
 from auth import login_required
@@ -95,6 +96,47 @@ def created(tenant_id):
     return render_template('tenant_created.html', info=info)
 
 
+# ── Acceso del cliente (usuario admin de su panel) ───────────────
+
+@bp.route('/<int:tenant_id>/admin/reset-password', methods=['POST'])
+@login_required
+def admin_reset_password(tenant_id):
+    """Regenera la contraseña del administrador del cliente y la muestra 1 vez."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    try:
+        result = tenant_service.reset_admin_password(tenant_id)
+    except Exception as exc:  # noqa: BLE001
+        flash(f'No se pudo regenerar la contraseña: {exc}', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+
+    # Stash en sesión flash: se muestra UNA sola vez (igual que las API keys).
+    session['_reset_admin_pw'] = {
+        'tenant_id':      tenant_id,
+        'slug':           tenant['slug'],
+        'nombre':         tenant['nombre'],
+        'admin_email':    result['admin_email'],
+        'admin_password': result['admin_password'],
+    }
+    return redirect(url_for('tenants.admin_password_shown', tenant_id=tenant_id))
+
+
+@bp.route('/<int:tenant_id>/admin/password')
+@login_required
+def admin_password_shown(tenant_id):
+    """Muestra la contraseña recién regenerada UNA sola vez (se borra al verla)."""
+    info = session.pop('_reset_admin_pw', None)
+    if not info or info.get('tenant_id') != tenant_id:
+        flash(
+            'La contraseña regenerada solo se muestra una vez. Si la perdiste, '
+            'vuelve a regenerarla desde la pestaña Técnico del tenant.',
+            'warning',
+        )
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+    return render_template('admin_password_reset.html', info=info)
+
+
 # ── Detalle ──────────────────────────────────────────────────────
 
 @bp.route('/<int:tenant_id>')
@@ -184,6 +226,24 @@ def integraciones_save(tenant_id):
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
 
 
+@bp.route('/<int:tenant_id>/ai/models')
+@login_required
+def ai_models(tenant_id):
+    """AJAX: consulta EN VIVO los modelos del servidor de IA y los cachea.
+    Lo usa el boton "Actualizar modelos" del panel de Integraciones. No bloquea
+    la carga de la pagina (esto corre solo cuando el operador lo pide)."""
+    from config import Config as _Cfg
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        return jsonify({'models': [], 'online': False, 'error': 'tenant no encontrado'}), 404
+    base = (request.args.get('base_url') or '').strip()
+    if not base:
+        base = ints.read_env(tenant['slug']).get('AI_BASE_URL', '')
+    base = base or _Cfg.AI_DEFAULT_BASE_URL
+    models = ints.refresh_ai_models(base)
+    return jsonify({'models': models, 'online': bool(models), 'base_url': base})
+
+
 # ── Cobros / mora ────────────────────────────────────────────────
 
 def _por():
@@ -270,6 +330,25 @@ def config_save(tenant_id):
         flash('Configuración del sitio actualizada.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando configuración: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
+
+
+@bp.route('/<int:tenant_id>/logo', methods=['POST'])
+@login_required
+def logo_upload(tenant_id):
+    """Sube/cambia el logo del sitio público (antes del login) del cliente."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    f = request.files.get('logo')
+    if not f or not f.filename:
+        flash('Selecciona un archivo de imagen para el logo.', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
+    try:
+        ccs.save_logo(tenant_id, f)
+        flash('Logo del sitio público actualizado. Refresca el sitio con Ctrl+F5 para verlo.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error subiendo el logo: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
 
 
@@ -454,22 +533,31 @@ def instancia_accion(tenant_id):
             applied = tm.migrate_db(tenant['db_name'])
             flash(f"Migración de BD: {len(applied)} aplicada(s)." if applied else "BD al día (nada que migrar).", 'success')
         elif accion == 'update':
-            # "Actualizar a última versión": pone al cliente al día con lo
-            # FUNCIONAL sin tocar su sitio público.
-            #   1) migrar estructura de su BD (aditivo, idempotente — no toca
-            #      cliente_config / public_site_settings / config_secciones, que
-            #      son los datos propios del sitio de cada cliente);
-            #   2) reiniciar su instancia para que tome el CÓDIGO compartido más
-            #      reciente (ya desplegado en APP_DIR).
+            # "Actualizar app": replica al cliente lo FUNCIONAL (después del login)
+            # + seguridad/backend, SIN tocar su sitio público ni sus datos.
+            #   1) TRAER el código desde GitHub con GATE de cambios públicos
+            #      (deploy_code); si hay cambios públicos y no include_public → BLOQUEA;
+            #   2) migrar estructura de su BD (aditivo — no toca cliente_config /
+            #      public_site_settings / config_secciones, que son SUS datos);
+            #   3) reiniciar su instancia para que cargue el código nuevo.
+            # "Deploy completo" (include_public=1) trae también el sitio público.
             import tenant_migrations as tm
-            applied = tm.migrate_db(tenant['db_name'])
-            reinicio = prov.restart_service(tenant['slug'])
-            partes = []
-            partes.append(f"{len(applied)} migración(es) aplicada(s)" if applied else "estructura ya al día")
-            partes.append("instancia reiniciada con el código más reciente"
-                          if prov.IS_LINUX else "reinicio omitido (dev)")
-            flash("Cliente actualizado a la última versión: " + "; ".join(partes)
-                  + ". Su sitio público (colores, secciones, datos de empresa) quedó intacto.", 'success')
+            include_public = bool(request.form.get('include_public'))
+            status, msg_deploy = prov.deploy_code(include_public=include_public)
+            if status == 'blocked':
+                flash("No se actualizó (nada se aplicó): " + msg_deploy, 'warning')
+            elif status == 'error':
+                flash("Error trayendo el código: " + msg_deploy
+                      + " — no se migró ni reinició.", 'error')
+            else:  # 'updated' | 'uptodate' → migrar (aditivo) + reiniciar
+                partes = [f"código: {msg_deploy}"]
+                applied = tm.migrate_db(tenant['db_name'])
+                partes.append(f"{len(applied)} migración(es) de BD" if applied else "BD ya al día")
+                prov.restart_service(tenant['slug'])
+                partes.append("instancia reiniciada" if prov.IS_LINUX else "reinicio omitido (dev)")
+                flash("Cliente actualizado: " + "; ".join(partes)
+                      + ". Su sitio público (colores, logo, secciones, datos) quedó intacto.",
+                      'success')
         else:
             flash('Acción no reconocida.', 'warning')
     except Exception as exc:  # noqa: BLE001

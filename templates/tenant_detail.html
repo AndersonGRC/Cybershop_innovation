@@ -53,14 +53,46 @@
 <!-- ===== Tab: Configuración (empresa + colores) ===== -->
 <section class="tabpanel is-active" id="tab-config">
     {% if cfg %}
-    <form method="post" action="{{ url_for('tenants.config_save', tenant_id=tenant.id) }}">
+    {# ── Logo del sitio público (formulario aparte: requiere multipart) ── #}
+    {% set _logo = cfg['values'].get('empresa_logo_url') %}
+    {% set _pub = ('https://' ~ runtime.custom_domain) if (runtime and runtime.custom_domain)
+                  else (('https://' ~ runtime.subdomain ~ '.cybershopcol.com') if (runtime and runtime.subdomain)
+                  else 'https://cybershopcol.com') %}
+    <article class="card">
+        <h3>Logo del sitio público <small class="muted">(antes del login)</small></h3>
+        <p><small>Es el logo que se muestra en el encabezado y el footer del sitio público del cliente. Sube una imagen para reemplazarlo.</small></p>
+        <div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;">
+            <div style="text-align:center;">
+                <div style="font-size:.75rem;color:#64748b;margin-bottom:4px;">Logo actual</div>
+                {% if _logo %}
+                <img src="{{ _pub }}{{ _logo }}" alt="Logo actual"
+                     style="height:64px;max-width:240px;object-fit:contain;background:#0e1b33;border-radius:8px;padding:8px;"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">
+                <span style="display:none;color:#94a3b8;font-size:.8rem;">(no se pudo previsualizar)</span>
+                {% else %}
+                <span style="color:#94a3b8;font-size:.85rem;">Sin logo (se usa el genérico)</span>
+                {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('tenants.logo_upload', tenant_id=tenant.id) }}"
+                  enctype="multipart/form-data" style="margin:0;">
+                <label>Cambiar logo
+                    <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg,.gif" required>
+                </label>
+                <button type="submit" class="btn-small">Subir logo</button>
+                <small class="muted">Formatos: PNG, JPG, WEBP, SVG o GIF.</small>
+            </form>
+        </div>
+    </article>
+
+    <form method="post" action="{{ url_for('tenants.config_save', tenant_id=tenant.id) }}" novalidate>
         {% for gkey, gtitle in site_groups %}
         <article class="card">
             <h3>{{ gtitle }}</h3>
             {% if gkey == 'colores' %}
             <p><small>Mismas variables que el sitio usa en vivo. El cliente también puede ajustarlas desde su propio panel.</small></p>
-            <div class="color-grid">
-                {% for f in site_fields if f.group == 'colores' %}
+
+            {# ── Macro para no repetir el campo de color ── #}
+            {% macro color_field(f) %}
                 <div class="color-field" title="{{ f.description }}">
                     <span class="color-label">{{ f.label }}</span>
                     <span class="color-row">
@@ -69,6 +101,25 @@
                                oninput="this.previousElementSibling.value=this.value" placeholder="{{ f.default }}">
                     </span>
                 </div>
+            {% endmacro %}
+
+            {# ── Sección 1: antes del login (sitio público) ── #}
+            <h4 class="color-section-title" style="margin:.6rem 0 .2rem;border-left:4px solid var(--color-primario,#122C94);padding-left:.5rem;">🌐 Antes del login · Sitio público</h4>
+            <p><small class="muted">Colores que ve cualquier visitante en la tienda pública: navbar, header, catálogo, carrito, alertas y landing de software.</small></p>
+            <div class="color-grid">
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' %}
+                {{ color_field(f) }}
+                {% endfor %}
+            </div>
+
+            <hr style="margin:1.2rem 0;border:none;border-top:2px dashed var(--color-borde,#cbd5e1);">
+
+            {# ── Sección 2: después del login (panel interno) ── #}
+            <h4 class="color-section-title" style="margin:.6rem 0 .2rem;border-left:4px solid var(--color-primario-oscuro,#091C5A);padding-left:.5rem;">🔒 Después del login · Panel del negocio</h4>
+            <p><small class="muted">Colores del área interna tras iniciar sesión: encabezados, menú lateral y links del panel. <strong>Nota:</strong> el “Color principal” también tiñe botones del sitio público (es una variable compartida).</small></p>
+            <div class="color-grid">
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'despues' %}
+                {{ color_field(f) }}
                 {% endfor %}
             </div>
             {% else %}
@@ -79,7 +130,9 @@
                     <textarea name="{{ f.key }}" rows="3">{{ cfg['values'].get(f.key, '') }}</textarea>
                     {% else %}
                     <input type="{{ 'url' if f.type == 'url' else ('email' if f.type == 'email' else 'text') }}"
-                           name="{{ f.key }}" value="{{ cfg['values'].get(f.key, '') }}" placeholder="{{ f.default or '' }}">
+                           name="{{ f.key }}"
+                           value="{{ '' if cfg['values'].get(f.key, '') == '#' else cfg['values'].get(f.key, '') }}"
+                           placeholder="{{ 'https://… (opcional)' if f.default == '#' else (f.default or '') }}">
                     {% endif %}
                 </label>
                 {% endfor %}
@@ -220,6 +273,17 @@
                     <select name="{{ f.key }}">
                         {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
                     </select>
+                    {% elif f.type == 'datalist' %}
+                    <input type="text" name="{{ f.key }}" value="{{ f.value }}" list="dl_{{ f.key }}"
+                           autocomplete="off" placeholder="Elige o escribe el modelo…">
+                    <datalist id="dl_{{ f.key }}">{% for opt in f.options %}<option value="{{ opt }}"></option>{% endfor %}</datalist>
+                    {% if f.key == 'AI_MODEL' %}
+                    <span class="ai-model-tools" style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
+                        <button type="button" class="secondary outline" id="ai-refresh-btn" style="margin:0;width:auto;padding:.25rem .6rem"
+                                data-url="{{ url_for('tenants.ai_models', tenant_id=tenant.id) }}">🔄 Actualizar modelos</button>
+                        <small class="muted" id="ai-model-status"></small>
+                    </span>
+                    {% endif %}
                     {% elif f.secret %}
                     <input type="text" name="{{ f.key }}" value="" autocomplete="off"
                            placeholder="{{ f.masked if f.has_value else '(no configurado)' }}">
@@ -233,6 +297,39 @@
         {% endfor %}
         <button type="submit">Guardar integraciones</button>
     </form>
+    <script>
+    (function(){
+        var btn = document.getElementById('ai-refresh-btn');
+        if(!btn) return;
+        var status = document.getElementById('ai-model-status');
+        var dl = document.getElementById('dl_AI_MODEL');
+        var baseInput = document.querySelector('#tab-integraciones [name="AI_BASE_URL"]');
+        var loaded = false;
+        function refresh(){
+            var base = (baseInput && baseInput.value || '').trim();
+            status.textContent = ' consultando modelos…';
+            btn.disabled = true;
+            fetch(btn.dataset.url + '?base_url=' + encodeURIComponent(base))
+                .then(function(r){ return r.json(); })
+                .then(function(j){
+                    if(j.models && j.models.length){
+                        dl.innerHTML = j.models.map(function(m){
+                            return '<option value="' + m.replace(/"/g,'&quot;') + '"></option>'; }).join('');
+                        status.textContent = ' ' + j.models.length + ' modelos disponibles ✓';
+                    } else {
+                        status.textContent = ' Tu PC de IA esta apagada o inalcanzable. Puedes escribir el modelo a mano.';
+                    }
+                })
+                .catch(function(){ status.textContent = ' No se pudo consultar (escribe el modelo a mano).'; })
+                .finally(function(){ btn.disabled = false; });
+        }
+        btn.addEventListener('click', refresh);
+        function maybeAuto(){ if(!loaded){ loaded = true; refresh(); } }
+        var tabBtn = document.querySelector('.tab[data-tab="integraciones"]');
+        if(tabBtn) tabBtn.addEventListener('click', maybeAuto);
+        if(location.hash === '#integraciones') setTimeout(maybeAuto, 300);
+    })();
+    </script>
 </section>
 
 <!-- ===== Tab: API keys ===== -->
@@ -405,8 +502,11 @@
         </form>
 
         <table style="margin-top:1rem;">
-            <tr><td>URL del sitio</td><td>{% if runtime %}<code>https://{{ runtime.subdomain }}.cybershopcol.com</code>{% else %}—{% endif %}</td></tr>
-            {% if runtime and runtime.custom_domain %}<tr><td>Dominio propio</td><td><code>{{ runtime.custom_domain }}</code></td></tr>{% endif %}
+            <tr><td>URL del sitio</td><td>
+                {% if runtime and runtime.custom_domain %}<code>https://{{ runtime.custom_domain }}</code> <span class="badge badge-success">dominio propio</span>
+                {% elif runtime %}<code>https://{{ runtime.subdomain }}.cybershopcol.com</code>
+                {% else %}—{% endif %}
+            </td></tr>
             <tr><td>Puerto abierto</td><td>{% if runtime and runtime.port %}<code>127.0.0.1:{{ runtime.port }}</code>{% else %}— (sin asignar){% endif %}</td></tr>
             <tr><td>Estado de la instancia</td>
                 <td>
@@ -427,9 +527,15 @@
 
         <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap; align-items:center;">
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
-                  onsubmit="return confirm('Actualiza este cliente a la última versión FUNCIONAL (estructura de BD + código). NO toca su sitio público (colores, secciones, datos de empresa). ¿Continuar?')">
+                  onsubmit="return confirm('Trae las mejoras FUNCIONALES (después del login) + seguridad/backend, migra la BD (aditivo) y reinicia. Se BLOQUEA si hay cambios del sitio público pendientes. NO toca datos del cliente. ¿Continuar?')">
                 <input type="hidden" name="accion" value="update">
-                <button class="btn-small" type="submit">⬆ Actualizar a última versión</button>
+                <button class="btn-small" type="submit">⬆ Actualizar app (después del login)</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
+                  onsubmit="return confirm('DEPLOY COMPLETO: trae TODO el código de master, INCLUIDO el sitio público (antes del login). Úsalo solo si los cambios públicos son intencionales. ¿Continuar?')">
+                <input type="hidden" name="accion" value="update">
+                <input type="hidden" name="include_public" value="1">
+                <button class="secondary outline btn-small" type="submit">🌐 Deploy completo (incluye público)</button>
             </form>
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;">
                 <input type="hidden" name="accion" value="restart"><button class="secondary outline btn-small" type="submit">Reiniciar instancia</button>
@@ -452,11 +558,30 @@
             {% endif %}
         </div>
         <p style="margin:.5rem 0 0;"><small class="muted">
-            <strong>Actualizar a última versión</strong>: pone al cliente al día con lo funcional
-            — migra la estructura de su BD (aditivo, no borra datos) y reinicia su instancia para
-            tomar el código compartido más reciente. <strong>No modifica su sitio público</strong>
-            (colores, secciones ni datos de empresa son propios de cada cliente).
+            <strong>Actualizar app (después del login)</strong>: replica las mejoras funcionales y de
+            seguridad — trae el código compartido (se <strong>bloquea si hay cambios del sitio público
+            pendientes</strong>), migra la BD (aditivo, no borra datos) y reinicia la instancia.
+            <strong>Nunca modifica el sitio público ni los datos del cliente</strong> (colores, logo,
+            secciones y datos de empresa son propios de cada cliente).
+            <strong>Deploy completo</strong>: úsalo solo cuando quieras publicar también cambios del
+            sitio público (antes del login).
         </small></p>
+    </article>
+
+    <article class="card">
+        <h3>Acceso del cliente a su panel</h3>
+        <p><small>Regenera la contraseña del usuario administrador (propietario) del cliente.
+        Se genera una contraseña temporal nueva y se muestra <strong>una sola vez</strong>; la
+        anterior deja de funcionar al instante. Úsalo cuando el cliente perdió su contraseña
+        inicial. La contraseña no se guarda en claro en ningún lado (solo su hash).</small></p>
+        {% if tenant.db_name %}
+        <form method="post" action="{{ url_for('tenants.admin_reset_password', tenant_id=tenant.id) }}"
+              onsubmit="return confirm('Esto invalida la contraseña actual del administrador del cliente y genera una nueva. ¿Continuar?')">
+            <button type="submit" class="secondary">🔑 Regenerar contraseña del administrador</button>
+        </form>
+        {% else %}
+        <p><em>El cliente no tiene BD aprovisionada; no se puede regenerar la contraseña.</em></p>
+        {% endif %}
     </article>
 
     <article class="card">

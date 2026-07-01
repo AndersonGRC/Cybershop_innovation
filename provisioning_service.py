@@ -144,6 +144,87 @@ def _run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
+# ── Despliegue de código compartido con GATE de "cambios públicos" ────────────
+# El panel corre como www-data (sin permiso de git). Un script root
+# (/usr/local/bin/cybershop-deploy-code.sh, NOPASSWD acotado) expone 2 subcomandos:
+#   changes -> lista los archivos que cambiarían respecto a origin/master (no muta)
+#   apply   -> git merge --ff-only origin/master (nunca hace merge ni pisa locales)
+# El código es COMPARTIDO por todas las instancias; cada cliente carga el nuevo
+# código al reiniciar su instancia. Las mejoras del app (después del login) y de
+# seguridad/backend fluyen; los cambios del SITIO PÚBLICO (antes del login) se
+# BLOQUEAN salvo include_public=True, para no soltarlos a los clientes sin querer.
+DEPLOY_SCRIPT = '/usr/local/bin/cybershop-deploy-code.sh'
+
+# Presentación del sitio PÚBLICO (antes del login). Único punto a mantener.
+# NO se incluye el backend/servicios ni el CSS compartido (variables.css,
+# layout.css, layout.js): eso fluye siempre (p. ej. parches de seguridad).
+PUBLIC_PATHS = (
+    'app/templates/plantillaindex.html', 'app/templates/plantillaindexError.html',
+    'app/templates/index.html', 'app/templates/productos.html',
+    'app/templates/producto_detalle.html', 'app/templates/servicios.html',
+    'app/templates/carrito.html', 'app/templates/metodos_pago.html',
+    'app/templates/respuesta_pago.html', 'app/templates/redireccion_payu.html',
+    'app/templates/software.html', 'app/templates/descargar.html',
+    'app/templates/comprar_plan.html', 'app/templates/activar_tienda.html',
+    'app/templates/renovar_plan.html', 'app/templates/login.html',
+    'app/templates/registrarcliente.html', 'app/templates/lista_deseos.html',
+    'app/templates/404.html',
+    'app/templates/share/publico_',          # prefijo: publico_carpeta/clave/vencido
+    'app/static/css/index.css', 'app/static/css/Productos.css',
+    'app/static/css/ProductoDetalle.css', 'app/static/css/carrito.css',
+    'app/static/css/error404.css', 'app/static/css/respuesta _pago.css',
+    'app/static/js/Shoppingcar.js',
+)
+
+
+def _is_public_path(path):
+    p = (path or '').strip()
+    for pat in PUBLIC_PATHS:
+        if pat.endswith('_'):                # patrón de prefijo (share/publico_*)
+            if p.startswith(pat):
+                return True
+        elif p == pat:
+            return True
+    return False
+
+
+def _run_deploy(subcmd):
+    r = subprocess.run(SUDO + ['-n', DEPLOY_SCRIPT, subcmd],
+                       capture_output=True, text=True, timeout=120)
+    out = ((r.stdout or '') + (r.stderr or '')).strip()
+    return r.returncode, out
+
+
+def deploy_code(include_public=False):
+    """Trae el código compartido desde GitHub con GATE de cambios públicos.
+    Devuelve (status, msg) con status ∈ {'updated','uptodate','blocked','error'}.
+    En dev (no-linux) es no-op ('uptodate')."""
+    if not IS_LINUX:
+        return 'uptodate', 'deploy de código omitido (dev)'
+    try:
+        rc, out = _run_deploy('changes')
+    except Exception as exc:  # noqa: BLE001
+        return 'error', f'no se pudo consultar cambios: {exc}'
+    if rc != 0:
+        return 'error', f'error consultando cambios: {out}'
+    changed = [ln for ln in out.splitlines() if ln.strip()]
+    if not changed:
+        return 'uptodate', 'ya al día (sin cambios)'
+    public_changed = [f for f in changed if _is_public_path(f)]
+    if public_changed and not include_public:
+        muestra = ', '.join(public_changed[:6]) + ('…' if len(public_changed) > 6 else '')
+        return 'blocked', (f'{len(changed)} cambio(s) incluyen el SITIO PÚBLICO '
+                           f'({muestra}). Si son intencionales, usa "Deploy completo".')
+    try:
+        rc2, out2 = _run_deploy('apply')
+    except Exception as exc:  # noqa: BLE001
+        return 'error', f'no se pudo aplicar el deploy: {exc}'
+    if rc2 != 0:
+        return 'error', f'error aplicando ({out2})'
+    nota = f' (incluyó {len(public_changed)} público)' if public_changed else ''
+    return 'updated', f'actualizado a {out2}: {len(changed)} archivo(s){nota}'
+
+
 def service_unit(slug):
     """Unidad systemd de la instancia. El tenant primario (sitio principal) corre
     en el servicio `cybershop`; el resto en la plantilla `cybershop@<slug>`."""

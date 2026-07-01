@@ -332,3 +332,20 @@ puerto abierto** de esa instancia.
 - **sudoers** del maestro: además de lo anterior, permitir escribir en
   `/etc/nginx/sites-available` y `sites-enabled`, y `nginx -t` + `systemctl reload nginx`.
 - El bloque exacto se previsualiza en el panel (pestaña Técnico → "Ver configuración del proxy").
+
+---
+
+## Actualizar clientes a la última versión (despliegue por cliente)
+
+Flujo completo (obligatorio para nuevos desarrollos): ver el repo de la app en
+`CyberShop/app/docs/flujo_desarrollo_y_despliegue.md`.
+
+**Resumen operativo** — pestaña **Técnico** de cada tenant:
+- **Actualizar app (después del login)**: `git pull` con **GATE de cambios públicos** + migrar BD
+  (aditivo) + reiniciar la instancia. Se **bloquea** si el push tocó el sitio público.
+- **Deploy completo (incluye público)**: igual, pero también publica el sitio público.
+
+**Infra:** script root `/usr/local/bin/cybershop-deploy-code.sh` (subcomandos `changes`/`apply`)
++ `/etc/sudoers.d/cybershop-deploy` (www-data, NOPASSWD, solo esos 2 subcomandos). El *gate* vive en
+`provisioning_service.py::PUBLIC_PATHS`. `git merge --ff-only` nunca pisa cambios locales → los
+hot-fixes hechos por SSH **deben commitearse/pushearse** o el deploy falla avisando.

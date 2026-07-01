@@ -10,6 +10,8 @@ from pathlib import Path
 
 import psycopg2.sql as sql
 
+from werkzeug.security import generate_password_hash
+
 from config import Config
 from crypto import aes_gcm_encrypt
 from db import control_plane_cursor, get_postgres_admin_conn, get_tenant_conn
@@ -75,6 +77,56 @@ def get_tenant(tenant_id: int) -> dict | None:
             WHERE t.id = %s
         """, (tenant_id,))
         return cur.fetchone()
+
+
+def reset_admin_password(tenant_id: int) -> dict:
+    """Regenera la contraseña del usuario administrador (propietario) del tenant.
+
+    Genera una nueva contraseña temporal y actualiza SOLO su hash en la BD del
+    cliente. No se guarda en claro en ningún lado: se devuelve una vez para
+    mostrarla al operador, igual que al crear el tenant. La contraseña anterior
+    deja de funcionar al instante (no requiere reiniciar la instancia: el login
+    lee el hash de la BD en cada ingreso).
+
+    Devuelve {'admin_email', 'admin_password'} (password en claro, mostrar 1 vez).
+    """
+    tenant = get_tenant(tenant_id)
+    if not tenant:
+        raise TenantCreationError("Tenant no encontrado.")
+    db_name = tenant.get('db_name')
+    if not db_name:
+        raise TenantCreationError(
+            "El cliente no tiene BD aprovisionada; no se puede regenerar la contraseña."
+        )
+
+    new_password = seed_service.generate_temp_password()
+    pwd_hash = generate_password_hash(new_password)
+
+    conn = get_tenant_conn(db_name)
+    try:
+        cur = conn.cursor()
+        # Resetea el propietario (rol_id 2); si no hubiera, un admin (rol_id 1).
+        # Es el mismo usuario que crea seed_service.apply_seed() al provisionar.
+        cur.execute(
+            'UPDATE usuarios SET "contraseña" = %s '
+            'WHERE id = ('
+            '    SELECT id FROM usuarios WHERE rol_id IN (1, 2) '
+            '    ORDER BY CASE WHEN rol_id = 2 THEN 0 ELSE 1 END, id ASC LIMIT 1'
+            ') RETURNING email',
+            (pwd_hash,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            raise TenantCreationError(
+                "El cliente no tiene un usuario administrador en su BD."
+            )
+        conn.commit()
+        admin_email = row[0]
+    finally:
+        conn.close()
+
+    return {'admin_email': admin_email, 'admin_password': new_password}
 
 
 def set_estado(tenant_id: int, estado: str):

@@ -5,6 +5,10 @@ BD del tenant — las MISMAS tablas que el app ya consume. Espejo multi-cliente
 de /admin/configuracion-cliente y /admin/sitio-publico. SIN tocar el app.
 """
 
+import os
+import uuid
+
+from config import Config
 from tenant_db import tenant_cursor
 
 
@@ -144,6 +148,72 @@ def save_config(tenant_id: int, form) -> int:
             _upsert(cur, k, v, f.get('type') or 'text', f.get('group') or 'general')
             guardados += 1
     return guardados
+
+
+_LOGO_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif')
+
+
+def save_logo(tenant_id: int, file_storage) -> str:
+    """Sube el logo del sitio público del tenant y actualiza `empresa_logo_url`.
+
+    Replica a `public_site_service.save_public_logo` del app: guarda el archivo
+    en el static COMPARTIDO (`<APP_DIR>/app/static/media/public_site/`) con un
+    nombre único, y escribe la URL en AMBAS tablas del tenant
+    (public_site_settings estructurada + cliente_config legacy), igual que
+    `save_config`, para que el cambio surta efecto siempre.
+
+    Devuelve la URL pública del logo (p.ej. `/static/media/public_site/...`).
+    """
+    if not file_storage or not file_storage.filename:
+        raise ValueError("No se recibió ningún archivo.")
+
+    _, ext = os.path.splitext(file_storage.filename)
+    ext = ext.lower()
+    if ext not in _LOGO_EXTS:
+        ext = '.png'
+
+    rel_dir = 'static/media/public_site'
+    abs_dir = os.path.join(Config.APP_DIR, 'app', rel_dir)
+    os.makedirs(abs_dir, exist_ok=True)
+    filename = f'logo_publico_{uuid.uuid4().hex[:12]}{ext}'
+    file_storage.save(os.path.join(abs_dir, filename))
+    logo_url = f'/{rel_dir}/{filename}'
+
+    with tenant_cursor(tenant_id) as cur:
+        # estructurada (la que el app lee PRIMERO) — crear si la BD es legacy
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS public_site_settings (
+                key VARCHAR(120) PRIMARY KEY,
+                value TEXT,
+                value_type VARCHAR(30),
+                group_name VARCHAR(60),
+                description TEXT,
+                sort_order INTEGER,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """
+        )
+        cur.execute(
+            """
+            UPDATE public_site_settings
+               SET value = %s, value_type = 'text', group_name = 'sitio_publico', updated_at = NOW()
+             WHERE key = 'empresa_logo_url'
+            """,
+            (logo_url,),
+        )
+        if cur.rowcount == 0:
+            cur.execute(
+                """
+                INSERT INTO public_site_settings (key, value, value_type, group_name, updated_at)
+                VALUES ('empresa_logo_url', %s, 'text', 'sitio_publico', NOW())
+                """,
+                (logo_url,),
+            )
+        # legacy: cliente_config
+        _upsert(cur, 'empresa_logo_url', logo_url, 'text', 'sitio_publico')
+
+    return logo_url
 
 
 def get_sections(tenant_id: int) -> dict:
