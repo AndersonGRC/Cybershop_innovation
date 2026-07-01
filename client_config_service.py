@@ -153,12 +153,30 @@ def save_config(tenant_id: int, form) -> int:
 _LOGO_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif')
 
 
+def _tenant_media_dir(tenant_id, rel_dir):
+    """Carpeta donde guardar medios públicos del tenant, AISLADA por cliente: el
+    override de su instancia (/var/www/cybershop-overrides/<slug>/static/...) si
+    existe, o el static compartido como fallback. Así cada tenant sirve solo lo
+    suyo (su app lee el override primero) y otra instancia no ve sus medios."""
+    slug = None
+    try:
+        import tenant_service
+        slug = (tenant_service.get_tenant(tenant_id) or {}).get('slug')
+    except Exception:
+        slug = None
+    root = os.getenv('INSTANCE_OVERRIDES_ROOT', '/var/www/cybershop-overrides')
+    if slug and os.path.isdir(os.path.join(root, slug)):
+        return os.path.join(root, slug, rel_dir)
+    return os.path.join(Config.APP_DIR, 'app', rel_dir)
+
+
 def save_logo(tenant_id: int, file_storage) -> str:
     """Sube el logo del sitio público del tenant y actualiza `empresa_logo_url`.
 
     Replica a `public_site_service.save_public_logo` del app: guarda el archivo
-    en el static COMPARTIDO (`<APP_DIR>/app/static/media/public_site/`) con un
-    nombre único, y escribe la URL en AMBAS tablas del tenant
+    en el override AISLADO de la instancia del tenant
+    (`/var/www/cybershop-overrides/<slug>/static/media/public_site/`, fallback al
+    static compartido) con un nombre único, y escribe la URL en AMBAS tablas del tenant
     (public_site_settings estructurada + cliente_config legacy), igual que
     `save_config`, para que el cambio surta efecto siempre.
 
@@ -173,7 +191,9 @@ def save_logo(tenant_id: int, file_storage) -> str:
         ext = '.png'
 
     rel_dir = 'static/media/public_site'
-    abs_dir = os.path.join(Config.APP_DIR, 'app', rel_dir)
+    # AISLAMIENTO POR CLIENTE: guardar en el override de la instancia del tenant
+    # (aislado); su app lo sirve vía el static-override y otra instancia da 404.
+    abs_dir = _tenant_media_dir(tenant_id, rel_dir)
     os.makedirs(abs_dir, exist_ok=True)
     filename = f'logo_publico_{uuid.uuid4().hex[:12]}{ext}'
     file_storage.save(os.path.join(abs_dir, filename))
