@@ -160,6 +160,7 @@ DEPLOY_SCRIPT = '/usr/local/bin/cybershop-deploy-code.sh'
 # layout.css, layout.js): eso fluye siempre (p. ej. parches de seguridad).
 PUBLIC_PATHS = (
     'app/templates/plantillaindex.html', 'app/templates/plantillaindexError.html',
+    'app/templates/tienda_suspendida.html',
     'app/templates/index.html', 'app/templates/productos.html',
     'app/templates/producto_detalle.html', 'app/templates/servicios.html',
     'app/templates/carrito.html', 'app/templates/metodos_pago.html',
