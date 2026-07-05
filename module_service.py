@@ -14,6 +14,7 @@ from tenant_db import tenant_cursor
 MODULES = [
     ('orders', 'Pedidos', 'Pedidos web y seguimiento comercial.', 'ventas', 'pedidos_habilitado', True),
     ('pos', 'Punto de Venta', 'Ventas rápidas, historial POS y facturación mostrador.', 'ventas', 'pos_habilitado', True),
+    ('caja', 'Caja / Arqueo', 'Apertura de caja con base, movimientos de efectivo y cuadre diario. Al desactivarlo el POS cobra sin exigir caja abierta.', 'ventas', 'caja_habilitado', True),
     ('quotes', 'Cotizaciones', 'Cotizaciones PDF y seguimiento.', 'ventas', 'cotizaciones_habilitado', True),
     ('billing', 'Cuentas de Cobro', 'Documentos de cobro para contratistas y servicios.', 'ventas', 'cuentas_cobro_habilitado', True),
     ('coupons', 'Cupones', 'Promociones y descuentos por código.', 'ventas', 'cupones_habilitado', True),
@@ -39,8 +40,8 @@ _ALL_CONFIG_KEYS = [m[4] for m in MODULES]
 
 # Defaults por plan (qué módulos vienen activos). El operador puede ajustar.
 PLAN_MODULES = {
-    'basico':   {'pos', 'inventory', 'orders', 'content', 'users'},
-    'estandar': {'pos', 'inventory', 'orders', 'content', 'users', 'quotes',
+    'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users'},
+    'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
                  'billing', 'coupons', 'wishlist', 'crm', 'support'},
     'ultra':    set(ALL_CODES) - {'facturacion_electronica'},
 }
