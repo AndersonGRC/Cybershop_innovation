@@ -105,12 +105,45 @@
 
             {# ── Sección 1: antes del login (sitio público) ── #}
             <h4 class="color-section-title" style="margin:.6rem 0 .2rem;border-left:4px solid var(--color-primario,#122C94);padding-left:.5rem;">🌐 Antes del login · Sitio público</h4>
-            <p><small class="muted">Colores que ve cualquier visitante en la tienda pública: navbar, header, catálogo, carrito, alertas y landing de software.</small></p>
+            <p><small class="muted">Colores que ve cualquier visitante en la tienda pública. Agrupados por zona para llegar rápido a lo que quieres ajustar.</small></p>
+
+            {# Subgrupos ordenados de la fase "antes"; usa el ui_group ya definido en el catálogo. #}
+            {% set antes_subgroups = [
+                ('estructura', '🧱 Barra superior y fondos', 'La barra de arriba (navbar), el degradado del encabezado y el fondo de las secciones.'),
+                ('botones',    '🔘 Botones',    'Los botones en los que se puede hacer clic en el sitio.'),
+                ('acentos',    '✨ Detalles que resaltan', 'Etiquetas e insignias (ej. “Nuevo”, “-20%”), precios tachados y los iconitos (lupa de búsqueda, métodos de pago).'),
+                ('catalogo',   '🛍️ Productos y precios', 'Precios de las tarjetas, etiquetas de categoría y botones de compra.'),
+                ('carrito',    '🛒 Carrito de compras',    'El encabezado del carrito y sus botones (+ / − / pagar).'),
+                ('alertas',    '💬 Mensajes y avisos', 'Los cuadros que aparecen para confirmar o mostrar errores.'),
+                ('descarga',   '💾 Página de descarga', 'La sección de software y la página para descargar la app.')
+            ] %}
+            {% set known_ui_groups = ['estructura', 'botones', 'acentos', 'catalogo', 'carrito', 'alertas', 'descarga'] %}
+
+            {% for gk, glabel, ghelp in antes_subgroups %}
+                {% set ns = namespace(has=false) %}
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and f.ui_group == gk %}{% set ns.has = true %}{% endfor %}
+                {% if ns.has %}
+                <h5 class="color-subgroup-title" style="margin:1rem 0 .1rem;font-size:.9rem;color:var(--color-primario,#122C94);">{{ glabel }}</h5>
+                <p style="margin:0 0 .3rem;"><small class="muted">{{ ghelp }}</small></p>
+                <div class="color-grid">
+                    {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and f.ui_group == gk %}
+                    {{ color_field(f) }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            {# Red de seguridad: cualquier color "antes" sin ui_group conocido no se pierde. #}
+            {% set nso = namespace(has=false) %}
+            {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and (f.ui_group is not defined or f.ui_group not in known_ui_groups) %}{% set nso.has = true %}{% endfor %}
+            {% if nso.has %}
+            <h5 class="color-subgroup-title" style="margin:1rem 0 .1rem;font-size:.9rem;color:var(--color-primario,#122C94);">🎨 Otros</h5>
             <div class="color-grid">
-                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' %}
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and (f.ui_group is not defined or f.ui_group not in known_ui_groups) %}
                 {{ color_field(f) }}
                 {% endfor %}
             </div>
+            {% endif %}
 
             <hr style="margin:1.2rem 0;border:none;border-top:2px dashed var(--color-borde,#cbd5e1);">
 
