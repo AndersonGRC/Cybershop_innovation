@@ -630,6 +630,38 @@
     </article>
 
     <article class="card">
+        <h3>🩺 Salud y respaldo</h3>
+        {% if health %}
+        <table>
+            <tr><td>Instancia (proceso)</td><td>
+                {% if health.service_active %}<span class="badge badge-success">🟢 activa</span>
+                {% else %}<span class="badge badge-warning">🔴 detenida</span>{% endif %}
+            </td></tr>
+            <tr><td>App responde</td><td>
+                {% if health.http_ok %}<span class="badge badge-success">🟢 sí</span>
+                    <small class="muted">estado: {{ health.status }} · BD: {{ health.db }} · Redis: {{ health.redis }}</small>
+                {% else %}<span class="badge badge-warning">🔴 no responde</span>
+                    {% if health.detail %}<small class="muted">{{ health.detail }}</small>{% endif %}
+                {% endif %}
+            </td></tr>
+        </table>
+        {% else %}
+        <p><small class="muted">No se pudo consultar el estado en este momento.</small></p>
+        {% endif %}
+
+        <div style="margin-top:1rem;">
+            {% if tenant.db_name %}
+            <a class="secondary" role="button" href="{{ url_for('tenants.backup_download', tenant_id=tenant.id) }}">
+                ⬇ Respaldar y descargar BD (.sql.gz)</a>
+            <p style="margin:.4rem 0 0;"><small class="muted">Genera un pg_dump al instante y lo descarga a tu equipo.
+                Guárdalo en un lugar seguro (fuera del servidor).</small></p>
+            {% else %}
+            <p><em>El cliente no tiene BD aprovisionada; no se puede respaldar.</em></p>
+            {% endif %}
+        </div>
+    </article>
+
+    <article class="card">
         <h3>Acceso del cliente a su panel</h3>
         <p><small>Regenera la contraseña del usuario administrador (propietario) del cliente.
         Se genera una contraseña temporal nueva y se muestra <strong>una sola vez</strong>; la

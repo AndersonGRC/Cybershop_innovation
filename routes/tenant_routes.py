@@ -2,7 +2,7 @@
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort, session,
-    jsonify,
+    jsonify, send_file,
 )
 
 from auth import login_required
@@ -197,9 +197,17 @@ def detail(tenant_id):
     except Exception:  # noqa: BLE001
         billing = None
 
+    # Salud de la instancia (proceso + app/BD), best-effort para no frenar la carga
+    health = None
+    try:
+        import maintenance_service as maint
+        health = maint.tenant_health(tenant_id)
+    except Exception:  # noqa: BLE001
+        health = None
+
     from config import Config as _Cfg
     return render_template(
-        'tenant_detail.html', tenant=tenant, keys=keys,
+        'tenant_detail.html', tenant=tenant, keys=keys, health=health,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
         integraciones=integraciones, dian=dian, runtime=runtime,
         proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
@@ -210,6 +218,25 @@ def detail(tenant_id):
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
         billing=billing,
     )
+
+
+@bp.route('/<int:tenant_id>/backup/download')
+@login_required
+def backup_download(tenant_id):
+    """Genera un pg_dump comprimido de la BD del cliente y lo descarga.
+    Es una operación de LECTURA (GET): no modifica nada del cliente."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    try:
+        import maintenance_service as maint
+        gz_path = maint.backup_now(tenant_id)
+    except Exception as exc:  # noqa: BLE001
+        flash(f'No se pudo generar el respaldo: {exc}', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+    return send_file(gz_path, as_attachment=True,
+                     download_name=f"{tenant['slug']}-respaldo.sql.gz",
+                     mimetype='application/gzip')
 
 
 @bp.route('/<int:tenant_id>/integraciones', methods=['POST'])
