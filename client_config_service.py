@@ -327,6 +327,52 @@ def _upsert(cur, clave, valor, tipo, grupo):
         )
 
 
+_PLANTILLAS_VALIDAS = {'clasico', 'innovador', 'ofertas', 'elegante'}
+
+
+def get_plantilla(tenant_id: int) -> str:
+    """Lee la plantilla de estilo del sitio del tenant (estructurada primero,
+    luego legacy). Default 'clasico'. El app la lee vía brand_config."""
+    try:
+        with tenant_cursor(tenant_id) as cur:
+            cur.execute("SELECT to_regclass('public.public_site_settings') AS t")
+            if cur.fetchone()['t']:
+                cur.execute("SELECT value FROM public_site_settings WHERE key = 'plantilla_sitio'")
+                r = cur.fetchone()
+                if r and r['value']:
+                    return r['value']
+            cur.execute("SELECT valor FROM cliente_config WHERE clave = 'plantilla_sitio'")
+            r = cur.fetchone()
+            if r and r['valor']:
+                return r['valor']
+    except Exception:
+        pass
+    return 'clasico'
+
+
+def set_plantilla(tenant_id: int, value: str) -> str:
+    """Fija la plantilla del sitio del tenant en ambas tablas (la estructurada es
+    la que el app lee primero). Valida contra el catálogo. Devuelve el valor final."""
+    value = (value or 'clasico').strip()
+    if value not in _PLANTILLAS_VALIDAS:
+        value = 'clasico'
+    with tenant_cursor(tenant_id) as cur:
+        cur.execute("SELECT to_regclass('public.public_site_settings') AS t")
+        if cur.fetchone()['t']:
+            cur.execute(
+                "UPDATE public_site_settings SET value=%s, updated_at=NOW() WHERE key='plantilla_sitio'",
+                (value,),
+            )
+            if cur.rowcount == 0:
+                cur.execute(
+                    "INSERT INTO public_site_settings (key, value, value_type, group_name, updated_at) "
+                    "VALUES ('plantilla_sitio', %s, 'text', 'sitio_publico', NOW())",
+                    (value,),
+                )
+        _upsert(cur, 'plantilla_sitio', value, 'text', 'sitio_publico')
+    return value
+
+
 def set_values(tenant_id: int, mapping: dict, grupo: str = 'empresa', tipo: str = 'text') -> int:
     """Escribe varias claves en cliente_config (omite vacías). Devuelve cuántas.
 

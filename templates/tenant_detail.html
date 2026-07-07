@@ -58,6 +58,30 @@
     {% set _pub = ('https://' ~ runtime.custom_domain) if (runtime and runtime.custom_domain)
                   else (('https://' ~ runtime.subdomain ~ '.cybershopcol.com') if (runtime and runtime.subdomain)
                   else 'https://cybershopcol.com') %}
+
+    {# ── Plantilla de estilo del sitio público (la elige el ADMIN, no el cliente) ── #}
+    <article class="card">
+        <h3>🎨 Plantilla del sitio público</h3>
+        <p><small>Elige el diseño del sitio público del cliente. Reutiliza sus mismos colores, slides y contenido — solo cambia el layout. Se refleja al recargar el sitio (Ctrl+F5). <em>Las plantillas alternativas se ven en clientes con el diseño instalado.</em></small></p>
+        <form method="post" action="{{ url_for('tenants.plantilla_save', tenant_id=tenant.id) }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:.6rem 0;">
+            {% for p in plantillas_sitio %}
+            <label onclick="this.closest('form').querySelectorAll('label.pl-card').forEach(function(c){c.style.borderColor='#e6ebf5';});this.style.borderColor='#122C94';"
+                   class="pl-card" style="position:relative;display:flex;flex-direction:column;gap:5px;cursor:pointer;border:2px solid {{ '#122C94' if plantilla_actual == p.key else '#e6ebf5' }};border-radius:12px;padding:14px;background:#fff;">
+              <input type="radio" name="plantilla_sitio" value="{{ p.key }}" {{ 'checked' if plantilla_actual == p.key }} style="position:absolute;opacity:0;">
+              <span style="height:44px;border-radius:8px;display:grid;place-items:center;font-size:1.4rem;background:linear-gradient(135deg,#122C94,#091C5A);">{{ p.icono }}</span>
+              <strong style="color:#0f172a;">{{ p.label }}{% if plantilla_actual == p.key %} <span style="color:#16a34a;">✔</span>{% endif %}</strong>
+              <span style="font-size:.78rem;color:#64748b;line-height:1.35;">{{ p.desc }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button type="submit">Aplicar plantilla</button>
+            <a href="{{ _pub }}" target="_blank" rel="noopener" role="button" class="secondary outline">Ver el sitio ↗</a>
+          </div>
+        </form>
+    </article>
+
     <article class="card">
         <h3>Logo del sitio público <small class="muted">(antes del login)</small></h3>
         <p><small>Es el logo que se muestra en el encabezado y el footer del sitio público del cliente. Sube una imagen para reemplazarlo.</small></p>

@@ -17,6 +17,16 @@ from tenant_service import TenantCreationError
 
 bp = Blueprint('tenants', __name__, url_prefix='/tenants')
 
+# Catálogo de plantillas de estilo del sitio público (lo elige el ADMIN por cliente).
+# Nota: las plantillas alternativas se ven solo en clientes con el diseño instalado
+# (override por instancia). En los demás, el valor se guarda pero el sitio no cambia.
+PLANTILLAS_SITIO = [
+    {'key': 'clasico',   'label': 'Clásica',    'icono': '🧱', 'desc': 'El diseño original, equilibrado.'},
+    {'key': 'innovador', 'label': 'Innovadora', 'icono': '✨', 'desc': 'Moderna: hero a pantalla completa y tarjetas.'},
+    {'key': 'ofertas',   'label': 'Ofertas',    'icono': '🏷️', 'desc': 'Promocional: franja de ofertas y destacados.'},
+    {'key': 'elegante',  'label': 'Elegante',   'icono': '💎', 'desc': 'Minimal y sobria, mucho espacio en blanco.'},
+]
+
 
 # ── Lista ────────────────────────────────────────────────────────
 
@@ -205,9 +215,18 @@ def detail(tenant_id):
     except Exception:  # noqa: BLE001
         health = None
 
+    # Plantilla de estilo del sitio público (la controla el admin, no el cliente)
+    plantilla_actual = 'clasico'
+    if tenant.get('db_name'):
+        try:
+            plantilla_actual = ccs.get_plantilla(tenant_id)
+        except Exception:  # noqa: BLE001
+            pass
+
     from config import Config as _Cfg
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys, health=health,
+        plantilla_actual=plantilla_actual, plantillas_sitio=PLANTILLAS_SITIO,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
         integraciones=integraciones, dian=dian, runtime=runtime,
         proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
@@ -357,6 +376,22 @@ def config_save(tenant_id):
         flash('Configuración del sitio actualizada.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando configuración: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
+
+
+@bp.route('/<int:tenant_id>/plantilla', methods=['POST'])
+@login_required
+def plantilla_save(tenant_id):
+    """El ADMIN fija la plantilla de estilo del sitio público del cliente.
+    Se refleja en el próximo cargue (el app lee brand_config fresco de la BD)."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    try:
+        val = ccs.set_plantilla(tenant_id, request.form.get('plantilla_sitio'))
+        flash(f'Plantilla del sitio aplicada: {val}. Refresca el sitio (Ctrl+F5).', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error cambiando la plantilla: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#config')
 
 
