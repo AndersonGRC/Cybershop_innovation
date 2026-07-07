@@ -103,7 +103,49 @@ def get_billing(tenant_id: int) -> dict:
         'a_suspension': max(0, MORA_DIAS_SUSPENSION - dias) if estado == 'en_mora' else None,
         'ultimo_pago': historial[0] if historial else None,
         'historial': historial,
+        'motor': get_motor_info(tenant_id),
     }
+
+
+def get_motor_info(tenant_id: int):
+    """Estado del MOTOR de cobro automático (tabla plan_compras en la BD del
+    tenant operador, id=1): próximo pago, último recordatorio, si es prueba
+    gratis y el LINK de renovación/pago para compartir por WhatsApp.
+    None si el tenant no está en el motor (o el motor no responde)."""
+    try:
+        from db import get_tenant_conn, control_plane_cursor
+        with control_plane_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT db_name FROM tenant_databases WHERE tenant_id = 1")
+            fila = cur.fetchone()
+        if not fila:
+            return None
+        conn = get_tenant_conn(fila['db_name'])
+        try:
+            from psycopg2.extras import RealDictCursor
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT plan_key, proximo_pago, ultimo_recordatorio, es_trial, "
+                    "       suspendida_por_pago, token_renovacion, buyer_email "
+                    "FROM plan_compras WHERE tenant_id = %s AND estado = 'ACTIVADA' "
+                    "ORDER BY id DESC LIMIT 1",
+                    (tenant_id,))
+                m = cur.fetchone()
+        finally:
+            conn.close()
+        if not m:
+            return None
+        return {
+            'plan_key': m['plan_key'],
+            'proximo_pago': m['proximo_pago'],
+            'ultimo_recordatorio': m['ultimo_recordatorio'],
+            'es_trial': bool(m.get('es_trial')),
+            'suspendida_por_pago': bool(m['suspendida_por_pago']),
+            'buyer_email': m['buyer_email'],
+            'link_pago': (f"https://cybershopcol.com/renovar/{m['token_renovacion']}"
+                          if m['token_renovacion'] else None),
+        }
+    except Exception:
+        return None
 
 
 # ── escritura ──────────────────────────────────────────────────

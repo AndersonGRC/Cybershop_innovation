@@ -434,6 +434,34 @@
         </table>
     </article>
 
+    <article class="card">
+        <h3>Motor de cobro automático</h3>
+        {% if billing.motor %}
+        <p>
+            {% if billing.motor.es_trial %}<span class="badge" style="background:#fff3d6;color:#8a6d1a;">🎁 Prueba gratis</span>{% endif %}
+            {% if billing.motor.suspendida_por_pago %}<span class="badge badge-danger">⏸ Suspendida por no-pago</span>{% endif %}
+            El cliente recibe <strong>recordatorios automáticos por correo</strong>
+            ({{ billing.motor.buyer_email }}) y puede pagar solo con su link.
+        </p>
+        <table>
+            <tr><td>Plan (motor)</td><td>{{ billing.motor.plan_key }}</td></tr>
+            <tr><td>Próximo cobro (motor)</td><td>{{ billing.motor.proximo_pago or '—' }}</td></tr>
+            <tr><td>Último recordatorio enviado</td><td>{{ billing.motor.ultimo_recordatorio or 'ninguno aún' }}</td></tr>
+            {% if billing.motor.link_pago %}
+            <tr><td>Link de pago (compártelo por WhatsApp)</td>
+                <td><input type="text" readonly value="{{ billing.motor.link_pago }}"
+                           style="width:100%;font-size:12px" onclick="this.select()"></td></tr>
+            {% endif %}
+        </table>
+        <p style="font-size:12px;color:#6b7280">Si registras un pago manual aquí, el motor
+           adopta la nueva fecha automáticamente en la próxima corrida diaria.</p>
+        {% else %}
+        <p><span class="badge badge-muted">Fuera del motor</span> — este cliente no recibe
+           recordatorios automáticos ni tiene link de pago. Córrelo con
+           <code>tools/backfill_plan_compras.py</code> en el servidor para incorporarlo.</p>
+        {% endif %}
+    </article>
+
     <div class="grid-2">
         <article class="card">
             <h3>Registrar pago</h3>
