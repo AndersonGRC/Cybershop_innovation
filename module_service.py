@@ -31,6 +31,7 @@ MODULES = [
     ('restaurant_tables', 'Mesas Restaurante', 'Plano de mesas, cuenta abierta y consumos.', 'operacion', 'restaurant_tables_habilitado', True),
     ('facturacion_electronica', 'Facturación DIAN', 'Facturación electrónica integrada con DIAN.', 'finanzas', 'facturacion_electronica', False),
     ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
+    ('bulk_upload', 'Cargue masivo', 'Importación masiva de productos y géneros por Excel. Al desactivarlo, esos botones desaparecen del panel del cliente.', 'catalogo', 'cargue_masivo_habilitado', True),
 ]
 
 MODULE_BY_CODE = {m[0]: m for m in MODULES}
@@ -40,9 +41,9 @@ _ALL_CONFIG_KEYS = [m[4] for m in MODULES]
 
 # Defaults por plan (qué módulos vienen activos). El operador puede ajustar.
 PLAN_MODULES = {
-    'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users'},
+    'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'bulk_upload'},
     'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
-                 'billing', 'coupons', 'wishlist', 'crm', 'support'},
+                 'billing', 'coupons', 'wishlist', 'crm', 'support', 'bulk_upload'},
     'ultra':    set(ALL_CODES) - {'facturacion_electronica'},
 }
 PLANS = list(PLAN_MODULES.keys())
