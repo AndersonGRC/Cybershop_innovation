@@ -525,6 +525,7 @@
                 <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}"></label>
             </div>
             <label><input type="checkbox" name="auto_suspender" {% if billing.auto_suspender %}checked{% endif %}> Auto-suspender tras {{ billing.umbral_suspension }} días de mora</label>
+            <label><input type="checkbox" name="avisos_off" {% if billing.avisos_off %}checked{% endif %}> Silenciar el aviso de "plan por vencer" en el panel del cliente</label>
             <label>Notas <input type="text" name="notas" value="{{ billing.notas }}"></label>
             <button type="submit">Guardar configuración</button>
         </form>

@@ -308,7 +308,9 @@ def billing_config(tenant_id):
             proxima_fecha=request.form.get('proxima_fecha'),
             auto_suspender=('auto_suspender' in request.form),
             notas=request.form.get('notas'),
+            avisos_off=('avisos_off' in request.form),
         )
+        billing_service.sync_billing_to_tenant(tenant_id)
         flash('Configuración de cobro guardada.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando cobro: {exc}', 'error')
@@ -332,6 +334,7 @@ def billing_pago(tenant_id):
         flash(f'Pago registrado. Próximo vencimiento: {nueva}.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error registrando pago: {exc}', 'error')
+    billing_service.sync_billing_to_tenant(tenant_id)
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
 
 
@@ -349,6 +352,7 @@ def billing_plazo(tenant_id):
         flash(f'Plazo extendido. Nuevo vencimiento: {destino}.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error extendiendo plazo: {exc}', 'error')
+    billing_service.sync_billing_to_tenant(tenant_id)
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
 
 
@@ -615,6 +619,7 @@ def instancia_accion(tenant_id):
                 partes = [f"código: {msg_deploy}"]
                 applied = tm.migrate_db(tenant['db_name'])
                 partes.append(f"{len(applied)} migración(es) de BD" if applied else "BD ya al día")
+                billing_service.sync_billing_to_tenant(tenant_id)  # refresca aviso de vencimiento
                 prov.restart_service(tenant['slug'])
                 partes.append("instancia reiniciada" if prov.IS_LINUX else "reinicio omitido (dev)")
                 flash("Cliente actualizado: " + "; ".join(partes)

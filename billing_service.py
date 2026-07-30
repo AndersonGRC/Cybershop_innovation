@@ -51,6 +51,9 @@ def _ensure_tables():
                 notas TEXT,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )""")
+        # Aditivo: silenciar (por tenant) el pop-up de "plan por vencer" del cliente.
+        cur.execute("ALTER TABLE tenant_billing "
+                    "ADD COLUMN IF NOT EXISTS avisos_off BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tenant_pagos (
                 id SERIAL PRIMARY KEY,
@@ -89,12 +92,14 @@ def get_billing(tenant_id: int) -> dict:
     monto = float(row['monto_mensual']) if row else 0.0
     proxima = row['proxima_fecha'] if row else None
     auto = bool(row['auto_suspender']) if row else True
+    avisos_off = bool(row.get('avisos_off')) if row else False
     estado, dias = _estado(proxima)
     return {
         'configurado': bool(row),
         'monto_mensual': monto,
         'proxima_fecha': proxima,
         'auto_suspender': auto,
+        'avisos_off': avisos_off,
         'notas': (row['notas'] if row else '') or '',
         'estado': estado,
         'dias': dias,
@@ -149,7 +154,8 @@ def get_motor_info(tenant_id: int):
 
 
 # ── escritura ──────────────────────────────────────────────────
-def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender=None, notas=None):
+def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender=None,
+               notas=None, avisos_off=None):
     """Upsert de la configuración de cobro (solo toca lo que no es None)."""
     _ensure_tables()
     monto = None
@@ -177,11 +183,45 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
             sets.append("auto_suspender = %s"); params.append(bool(auto_suspender))
         if notas is not None:
             sets.append("notas = %s"); params.append(notas)
+        if avisos_off is not None:
+            sets.append("avisos_off = %s"); params.append(bool(avisos_off))
         if not sets:
             return
         sets.append("updated_at = NOW()")
         params.append(tenant_id)
         cur.execute(f"UPDATE tenant_billing SET {', '.join(sets)} WHERE tenant_id = %s", params)
+
+
+def sync_billing_to_tenant(tenant_id: int) -> bool:
+    """Sincroniza al `cliente_config` del tenant las claves que su app usa para
+    el pop-up de "plan por vencer": `plan_vence` (fecha ISO o '') y
+    `plan_avisos_off` ('true'/'false'). UPDATE→INSERT (cliente_config puede no
+    tener índice único en 'clave'). Best-effort: no rompe si el tenant no existe."""
+    b = get_billing(tenant_id)
+    vence = b['proxima_fecha'].isoformat() if b.get('proxima_fecha') else ''
+    avisos_off = 'true' if b.get('avisos_off') else 'false'
+    try:
+        from db import get_tenant_conn, control_plane_cursor
+        with control_plane_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT db_name FROM tenant_databases WHERE tenant_id = %s", (tenant_id,))
+            row = cur.fetchone()
+        if not row:
+            return False
+        conn = get_tenant_conn(row['db_name'])
+        try:
+            cur = conn.cursor()
+            for clave, valor in (('plan_vence', vence), ('plan_avisos_off', avisos_off)):
+                cur.execute("UPDATE cliente_config SET valor = %s WHERE clave = %s", (valor, clave))
+                if cur.rowcount == 0:
+                    cur.execute(
+                        "INSERT INTO cliente_config (clave, valor, tipo, grupo) "
+                        "VALUES (%s, %s, 'text', 'facturacion')", (clave, valor))
+            conn.commit()
+        finally:
+            conn.close()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registrado_por=None):
