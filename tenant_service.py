@@ -390,7 +390,7 @@ def _rollback_partial_tenant(tenant_id: int | None, db_name: str | None, drop_db
 
 def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
                   admin_email: str = '', admin_nombre: str = 'Administrador',
-                  plan: str = 'estandar') -> dict:
+                  plan: str = 'estandar', timezone: str = 'America/Bogota') -> dict:
     """Orquesta la creación end-to-end de un tenant nuevo.
 
     Pasos (atómicos: si algo falla se revierte solo, sin BD huérfana):
@@ -479,9 +479,16 @@ def create_tenant(slug: str, nombre: str, key_label: str = 'Primera key',
         ) from exc
 
     # Paso 8: aprovisionar instancia + dominio (no aborta; reaprovisionable desde el detalle).
+    try:
+        import timezone_service as _tzs
+        if not _tzs.is_valid(timezone):
+            timezone = 'America/Bogota'
+    except Exception:  # noqa: BLE001
+        timezone = 'America/Bogota'
     prov = {'port': None, 'domain': None, 'instance_status': 'pending'}
     try:
-        prov = provisioning_service.provision(tenant_id, slug, db_name, subdomain=slug)
+        prov = provisioning_service.provision(tenant_id, slug, db_name, subdomain=slug,
+                                              timezone=timezone)
     except Exception as exc:  # noqa: BLE001
         prov['error'] = str(exc)
         warnings.append(f"aprovisionamiento pendiente ({exc}); usá «Reaprovisionar» en Técnico.")

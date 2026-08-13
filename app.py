@@ -6,7 +6,16 @@ Levanta el servidor:
 """
 
 import logging
+import os
 import sys
+import time as _time
+
+# Zona horaria del proceso del maestro (Colombia por defecto). El servidor corre
+# en UTC; sin esto datetime.now()/logs quedarían adelantados. Override por env
+# MASTER_TIMEZONE. Se fija antes de usar datetime.
+os.environ['TZ'] = os.getenv('MASTER_TIMEZONE', 'America/Bogota')
+if hasattr(_time, 'tzset'):
+    _time.tzset()
 
 from flask import Flask, redirect, url_for, g
 from werkzeug.middleware.proxy_fix import ProxyFix

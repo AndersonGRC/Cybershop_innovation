@@ -63,6 +63,19 @@
             </small>
         </label>
 
+        <label for="timezone">
+            Zona horaria
+            <select id="timezone" name="timezone" required>
+                {% for iana, etiqueta, offset in timezones %}
+                <option value="{{ iana }}" {% if (form.timezone or 'America/Bogota') == iana %}selected{% endif %}>{{ etiqueta }} · {{ offset }} ({{ iana }})</option>
+                {% endfor %}
+            </select>
+            <small>
+                Las fechas y horas del cliente (ventas, historial, contabilidad…) se
+                registran en esta zona. Se puede cambiar luego en la pestaña Técnico.
+            </small>
+        </label>
+
         <div class="grid">
             <label for="empresa_telefono">
                 Teléfono <span style="font-weight:normal">(opcional)</span>

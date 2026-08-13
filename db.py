@@ -5,12 +5,19 @@ CyberShop/app/services/db_layer.py — así las migraciones y el formato
 de credenciales cifradas son 100% compatibles entre ambos servicios.
 """
 
+import os
 from contextlib import contextmanager
 
 import psycopg2
 from psycopg2.extras import DictCursor
 
 from config import Config
+
+# Zona horaria del operador (el maestro opera en Colombia). Fija la sesión de BD
+# para que now()/CURRENT_TIMESTAMP de cobros/pagos/logs queden en hora local y no
+# en UTC. Override por env MASTER_TIMEZONE si algún día el operador cambia de país.
+_MASTER_TZ = os.getenv('MASTER_TIMEZONE', 'America/Bogota')
+_TZ_OPTION = f'-c timezone={_MASTER_TZ}'
 
 
 # ──────────────────────────────────────────────
@@ -25,6 +32,7 @@ def get_control_plane_conn():
         port=Config.CP_DB_PORT,
         user=Config.CP_DB_USER,
         password=Config.CP_DB_PASSWORD,
+        options=_TZ_OPTION,
     )
 
 
@@ -75,4 +83,5 @@ def get_tenant_conn(db_name):
         port=Config.PG_PORT,
         user=Config.PG_USER,
         password=Config.PG_PASSWORD,
+        options=_TZ_OPTION,
     )

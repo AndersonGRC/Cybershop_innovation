@@ -122,7 +122,7 @@ def ensure_overrides_dir(slug):
 
 
 # ── EnvironmentFile por instancia ──────────────────────────────
-def write_instance_env(slug, db_name, port, tenant_id):
+def write_instance_env(slug, db_name, port, tenant_id, timezone='America/Bogota'):
     """Escribe los overrides de runtime, preservando integraciones y secreto."""
     env = ints.read_env(slug)
     env['PORT'] = str(port)
@@ -132,6 +132,9 @@ def write_instance_env(slug, db_name, port, tenant_id):
     env['CYBERSHOP_API_ENABLED'] = '1'
     env['INSTANCE_OVERRIDES_DIR'] = ensure_overrides_dir(slug)
     env.setdefault('FLASK_SECRET_KEY', secrets.token_hex(32))
+    # Zona horaria del cliente: nace con este valor (la app la aplica al proceso
+    # y a la sesión de BD). setdefault preserva una ya configurada desde el panel.
+    env.setdefault('APP_TIMEZONE', timezone or 'America/Bogota')
     ints._write_env(slug, env)
 
 
@@ -323,7 +326,8 @@ def issue_ssl_async(domains):
 
 
 # ── Orquestador ────────────────────────────────────────────────
-def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
+def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None,
+              timezone='America/Bogota'):
     """Asigna puerto, escribe env, registra runtime y (en Linux) levanta la
     instancia + el proxy (nginx/Caddy). Valida el dominio (seguridad).
     Devuelve {port, domain, custom_domain, instance_status}."""
@@ -343,11 +347,18 @@ def provision(tenant_id, slug, db_name, subdomain=None, custom_domain=None):
     subdomain = proxy_service.validate_subdomain(subdomain or slug)
     custom_domain = proxy_service.validate_domain(custom_domain) if custom_domain else None
     port = allocate_port(tenant_id)
-    write_instance_env(slug, db_name, port, tenant_id)
+    write_instance_env(slug, db_name, port, tenant_id, timezone=timezone)
 
     status = 'pending'
     ssl_msgs = []
     if IS_LINUX:
+        # El cliente nuevo debe nacer en la ÚLTIMA versión estable: sincroniza el
+        # código compartido a origin/master (ff-only) antes de arrancar la
+        # instancia. Best-effort: un problema de git no debe frenar la creación.
+        try:
+            deploy_code(include_public=True)
+        except Exception:  # noqa: BLE001
+            pass
         enable_service(slug)
         write_site(domain_for(subdomain), port, is_subdomain=True)
         if custom_domain:

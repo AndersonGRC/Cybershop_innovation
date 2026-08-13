@@ -12,6 +12,7 @@ import client_config_service as ccs
 import module_service as ms
 import integrations_service as ints
 import billing_service
+import timezone_service as tzs
 from tenant_service import TenantCreationError
 
 
@@ -51,17 +52,20 @@ def nuevo():
         plan = request.form.get('plan', 'estandar')
         telefono = request.form.get('empresa_telefono', '')
         whatsapp = request.form.get('empresa_whatsapp', '')
+        timezone = request.form.get('timezone', 'America/Bogota')
         form = {'slug': slug, 'nombre': nombre, 'admin_email': admin_email,
                 'admin_nombre': admin_nombre, 'plan': plan,
-                'empresa_telefono': telefono, 'empresa_whatsapp': whatsapp}
+                'empresa_telefono': telefono, 'empresa_whatsapp': whatsapp,
+                'timezone': timezone}
         try:
             result = tenant_service.create_tenant(
                 slug=slug, nombre=nombre, admin_email=admin_email,
-                admin_nombre=admin_nombre, plan=plan,
+                admin_nombre=admin_nombre, plan=plan, timezone=timezone,
             )
         except TenantCreationError as exc:
             flash(str(exc), 'error')
-            return render_template('tenant_new.html', form=form, plans=ms.PLANS)
+            return render_template('tenant_new.html', form=form, plans=ms.PLANS,
+                                   timezones=tzs.TIMEZONES)
 
         # Datos de contacto opcionales en la BD del cliente (no aborta si falla).
         try:
@@ -83,8 +87,9 @@ def nuevo():
     return render_template(
         'tenant_new.html',
         form={'slug': '', 'nombre': '', 'admin_email': '', 'admin_nombre': '',
-              'plan': 'estandar', 'empresa_telefono': '', 'empresa_whatsapp': ''},
-        plans=ms.PLANS,
+              'plan': 'estandar', 'empresa_telefono': '', 'empresa_whatsapp': '',
+              'timezone': 'America/Bogota'},
+        plans=ms.PLANS, timezones=tzs.TIMEZONES,
     )
 
 
