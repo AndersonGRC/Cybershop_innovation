@@ -223,6 +223,10 @@ def detail(tenant_id):
         except Exception:  # noqa: BLE001
             pass
 
+    # Zona horaria de la instancia (para el desplegable del panel)
+    import timezone_service as tzs
+    tz_actual = tzs.current_tz(tenant['slug'])
+
     from config import Config as _Cfg
     return render_template(
         'tenant_detail.html', tenant=tenant, keys=keys, health=health,
@@ -236,6 +240,7 @@ def detail(tenant_id):
         site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
         billing=billing,
+        timezones=tzs.TIMEZONES, tz_actual=tz_actual,
     )
 
 
@@ -270,6 +275,42 @@ def integraciones_save(tenant_id):
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando integraciones: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
+
+
+@bp.route('/<int:tenant_id>/zona-horaria', methods=['POST'])
+@login_required
+def zona_horaria_save(tenant_id):
+    """Fija la zona horaria del cliente: escribe APP_TIMEZONE en el .env de su
+    instancia (lo que la app aplica al proceso y a la sesión de BD) y reinicia
+    para aplicarla. NO retroactivo: solo afecta registros nuevos."""
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        abort(404)
+    import timezone_service as tzs
+    import provisioning_service as prov
+    from config import Config as _Cfg
+    tz = (request.form.get('timezone') or '').strip()
+    if not tzs.is_valid(tz):
+        flash('Zona horaria no válida.', 'error')
+        return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
+    try:
+        tzs.set_tz(tenant['slug'], tz)
+        # Copia informativa en la BD del cliente (queda relacional con su config)
+        if tenant.get('db_name'):
+            try:
+                ccs.set_values(tenant_id, {'timezone': tz}, 'empresa')
+            except Exception:  # noqa: BLE001
+                pass
+        prov.restart_service(tenant['slug'])
+        if tenant['slug'] == _Cfg.PRIMARY_TENANT_SLUG:
+            flash('Zona guardada. Nota: el cliente primario lee su .cybershop.conf; '
+                  'para una zona distinta a la de por defecto define APP_TIMEZONE ahí.', 'warning')
+        else:
+            flash(f'Zona horaria actualizada a {tz}. La instancia se reinició para aplicarla '
+                  '(solo afecta registros nuevos).', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error aplicando la zona horaria: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
 
 
 @bp.route('/<int:tenant_id>/ai/models')

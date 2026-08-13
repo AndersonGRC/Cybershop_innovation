@@ -560,6 +560,27 @@
 
 <section class="tabpanel" id="tab-tecnico">
     {% set estado_es = {'pending':'pendiente','running':'activa','stopped':'detenida','cancelled':'cancelada'} %}
+
+    <article class="card">
+        <h3>🕒 Zona horaria del cliente</h3>
+        <p><small class="muted">Las fechas y horas de este cliente (ventas, historial POS, movimientos contables, mesas…) se registran en esta zona. Se aplica a los <strong>registros nuevos</strong> desde que se guarda — los anteriores no se modifican ni se borran. Al guardar se reinicia la instancia para aplicarla.</small></p>
+        <form method="post" action="{{ url_for('tenants.zona_horaria_save', tenant_id=tenant.id) }}" style="margin-top:.6rem;">
+            <div class="grid-2">
+                <label>Zona horaria
+                    <select name="timezone">
+                        {% for iana, etiqueta, offset in timezones %}
+                        <option value="{{ iana }}" {% if iana == tz_actual %}selected{% endif %}>{{ etiqueta }} · {{ offset }} ({{ iana }})</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>&nbsp;
+                    <button type="submit">Guardar y aplicar</button>
+                </label>
+            </div>
+            <p style="margin:.4rem 0 0;"><small class="muted">Actual: <strong>{{ tz_actual }}</strong></small></p>
+        </form>
+    </article>
+
     <article class="card">
         <h3>Instancia y dominio</h3>
 
