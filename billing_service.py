@@ -223,6 +223,24 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
         cur.execute(f"UPDATE tenant_billing SET {', '.join(sets)} WHERE tenant_id = %s", params)
 
 
+def toggle_avisos(tenant_id: int) -> bool:
+    """Invierte avisos_off (silenciar/mostrar el aviso de vencimiento en el panel
+    del cliente). Devuelve el NUEVO avisos_off (True = silenciado). Funciona en
+    cualquier momento, aunque el plan esté al día."""
+    _ensure_tables()
+    with control_plane_cursor(dict_cursor=True) as cur:
+        cur.execute("SELECT avisos_off FROM tenant_billing WHERE tenant_id = %s", (tenant_id,))
+        row = cur.fetchone()
+        nuevo = not (bool(row['avisos_off']) if row else False)
+        if row:
+            cur.execute("UPDATE tenant_billing SET avisos_off = %s, updated_at = NOW() "
+                        "WHERE tenant_id = %s", (nuevo, tenant_id))
+        else:
+            cur.execute("INSERT INTO tenant_billing (tenant_id, avisos_off) VALUES (%s, %s)",
+                        (tenant_id, nuevo))
+    return nuevo
+
+
 def sync_billing_to_tenant(tenant_id: int) -> bool:
     """Sincroniza al `cliente_config` del tenant las claves que su app usa para
     el pop-up de "plan por vencer": `plan_vence` (fecha ISO o '') y

@@ -518,6 +518,23 @@
     </div>
 
     <article class="card">
+        <h3>Aviso de vencimiento en el panel del cliente</h3>
+        <p>
+            {% if billing.avisos_off %}
+            <span class="badge badge-muted">🔕 Silenciado</span> — el cliente <strong>no ve</strong> el aviso de "plan por vencer / vencido".
+            {% else %}
+            <span class="badge badge-success">🔔 Activo</span> — el cliente ve el aviso cuando el plan está por vencer o vencido.
+            {% endif %}
+        </p>
+        <form method="post" action="{{ url_for('tenants.billing_avisos_toggle', tenant_id=tenant.id) }}">
+            <button type="submit" class="{% if not billing.avisos_off %}secondary{% endif %}">
+                {% if billing.avisos_off %}🔔 Activar aviso{% else %}🔕 Silenciar aviso{% endif %}
+            </button>
+            <small class="muted">Préndelo o apágalo cuando quieras — funciona aunque el plan esté al día.</small>
+        </form>
+    </article>
+
+    <article class="card">
         <h3>Configuración de cobro</h3>
         <form method="post" action="{{ url_for('tenants.billing_config', tenant_id=tenant.id) }}">
             <div class="grid-2">
@@ -537,7 +554,6 @@
             </div>
             <small class="muted">Tras el vencimiento, el sistema espera <strong>estos días</strong> antes de suspender.
                 Vacío = {{ billing.umbral_suspension }} días (por defecto). Tú controlas el plazo por cliente.</small>
-            <label><input type="checkbox" name="avisos_off" {% if billing.avisos_off %}checked{% endif %}> Silenciar el aviso de "plan por vencer" en el panel del cliente</label>
             <label>Notas <input type="text" name="notas" value="{{ billing.notas }}"></label>
             <button type="submit">Guardar configuración</button>
         </form>

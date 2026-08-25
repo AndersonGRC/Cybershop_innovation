@@ -354,13 +354,28 @@ def billing_config(tenant_id):
             proxima_fecha=request.form.get('proxima_fecha'),
             auto_suspender=('auto_suspender' in request.form),
             notas=request.form.get('notas'),
-            avisos_off=('avisos_off' in request.form),
             dias_suspension=request.form.get('dias_suspension'),
         )
         billing_service.sync_billing_to_tenant(tenant_id)
         flash('Configuración de cobro guardada.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando cobro: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
+
+
+@bp.route('/<int:tenant_id>/billing/avisos-toggle', methods=['POST'])
+@login_required
+def billing_avisos_toggle(tenant_id):
+    """Prende/apaga (1 clic) el aviso de vencimiento en el panel del cliente."""
+    if not tenant_service.get_tenant(tenant_id):
+        abort(404)
+    try:
+        nuevo = billing_service.toggle_avisos(tenant_id)
+        billing_service.sync_billing_to_tenant(tenant_id)
+        flash('Aviso de vencimiento ' + ('SILENCIADO 🔕' if nuevo else 'ACTIVADO 🔔')
+              + ' para este cliente.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error al cambiar el aviso: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
 
 
