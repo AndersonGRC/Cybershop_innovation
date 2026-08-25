@@ -75,6 +75,10 @@ def _ensure_tables():
         # NULL = usar el default (DIAS_SUSPENSION_DEFAULT / MORA_DIAS_SUSPENSION).
         cur.execute("ALTER TABLE tenant_billing "
                     "ADD COLUMN IF NOT EXISTS dias_suspension INT")
+        # Aditivo: forzar mostrar el aviso (modo manual "mostrar siempre", aunque
+        # el plan esté al día). Junto con avisos_off define el modo del aviso.
+        cur.execute("ALTER TABLE tenant_billing "
+                    "ADD COLUMN IF NOT EXISTS aviso_forzar BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tenant_pagos (
                 id SERIAL PRIMARY KEY,
@@ -114,6 +118,8 @@ def get_billing(tenant_id: int) -> dict:
     proxima = row['proxima_fecha'] if row else None
     auto = bool(row['auto_suspender']) if row else True
     avisos_off = bool(row.get('avisos_off')) if row else False
+    aviso_forzar = bool(row.get('aviso_forzar')) if row else False
+    aviso_modo = 'silenciar' if avisos_off else ('forzar' if aviso_forzar else 'auto')
     dias_susp = row.get('dias_suspension') if row else None
     estado, dias = _estado(proxima)
     motor = get_motor_info(tenant_id)
@@ -127,6 +133,8 @@ def get_billing(tenant_id: int) -> dict:
         'proxima_fecha': proxima,
         'auto_suspender': auto,
         'avisos_off': avisos_off,
+        'aviso_forzar': aviso_forzar,
+        'aviso_modo': aviso_modo,
         'dias_suspension': int(dias_susp) if dias_susp is not None else None,
         'notas': (row['notas'] if row else '') or '',
         'estado': estado,
@@ -223,22 +231,26 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
         cur.execute(f"UPDATE tenant_billing SET {', '.join(sets)} WHERE tenant_id = %s", params)
 
 
-def toggle_avisos(tenant_id: int) -> bool:
-    """Invierte avisos_off (silenciar/mostrar el aviso de vencimiento en el panel
-    del cliente). Devuelve el NUEVO avisos_off (True = silenciado). Funciona en
-    cualquier momento, aunque el plan esté al día."""
+def set_aviso_modo(tenant_id: int, modo: str) -> str:
+    """Fija el modo del aviso de vencimiento en el panel del cliente:
+      - 'auto'     : se muestra solo a 3 días de vencer o en mora (default).
+      - 'forzar'   : se muestra SIEMPRE (activación manual, aunque esté al día).
+      - 'silenciar': nunca se muestra.
+    Se mapea a avisos_off + aviso_forzar. Devuelve el modo aplicado."""
     _ensure_tables()
-    with control_plane_cursor(dict_cursor=True) as cur:
-        cur.execute("SELECT avisos_off FROM tenant_billing WHERE tenant_id = %s", (tenant_id,))
-        row = cur.fetchone()
-        nuevo = not (bool(row['avisos_off']) if row else False)
-        if row:
-            cur.execute("UPDATE tenant_billing SET avisos_off = %s, updated_at = NOW() "
-                        "WHERE tenant_id = %s", (nuevo, tenant_id))
+    if modo not in ('auto', 'forzar', 'silenciar'):
+        modo = 'auto'
+    off = (modo == 'silenciar')
+    forzar = (modo == 'forzar')
+    with control_plane_cursor() as cur:
+        cur.execute("SELECT 1 FROM tenant_billing WHERE tenant_id = %s", (tenant_id,))
+        if cur.fetchone():
+            cur.execute("UPDATE tenant_billing SET avisos_off = %s, aviso_forzar = %s, "
+                        "updated_at = NOW() WHERE tenant_id = %s", (off, forzar, tenant_id))
         else:
-            cur.execute("INSERT INTO tenant_billing (tenant_id, avisos_off) VALUES (%s, %s)",
-                        (tenant_id, nuevo))
-    return nuevo
+            cur.execute("INSERT INTO tenant_billing (tenant_id, avisos_off, aviso_forzar) "
+                        "VALUES (%s, %s, %s)", (tenant_id, off, forzar))
+    return modo
 
 
 def sync_billing_to_tenant(tenant_id: int) -> bool:
@@ -249,6 +261,7 @@ def sync_billing_to_tenant(tenant_id: int) -> bool:
     b = get_billing(tenant_id)
     vence = b['proxima_fecha'].isoformat() if b.get('proxima_fecha') else ''
     avisos_off = 'true' if b.get('avisos_off') else 'false'
+    aviso_forzar = 'true' if b.get('aviso_forzar') else 'false'
     try:
         from db import get_tenant_conn, control_plane_cursor
         with control_plane_cursor(dict_cursor=True) as cur:
@@ -259,7 +272,8 @@ def sync_billing_to_tenant(tenant_id: int) -> bool:
         conn = get_tenant_conn(row['db_name'])
         try:
             cur = conn.cursor()
-            for clave, valor in (('plan_vence', vence), ('plan_avisos_off', avisos_off)):
+            for clave, valor in (('plan_vence', vence), ('plan_avisos_off', avisos_off),
+                                 ('plan_aviso_forzar', aviso_forzar)):
                 cur.execute("UPDATE cliente_config SET valor = %s WHERE clave = %s", (valor, clave))
                 if cur.rowcount == 0:
                     cur.execute(

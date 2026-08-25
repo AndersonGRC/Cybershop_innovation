@@ -363,16 +363,19 @@ def billing_config(tenant_id):
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
 
 
-@bp.route('/<int:tenant_id>/billing/avisos-toggle', methods=['POST'])
+@bp.route('/<int:tenant_id>/billing/aviso-modo', methods=['POST'])
 @login_required
-def billing_avisos_toggle(tenant_id):
-    """Prende/apaga (1 clic) el aviso de vencimiento en el panel del cliente."""
+def billing_aviso_modo(tenant_id):
+    """Fija el modo del aviso de vencimiento (auto / forzar / silenciar) en 1 clic."""
     if not tenant_service.get_tenant(tenant_id):
         abort(404)
+    etiqueta = {'auto': 'AUTOMÁTICO (3 días antes / vencido) 🔔',
+                'forzar': 'MOSTRAR SIEMPRE (manual) 📣',
+                'silenciar': 'SILENCIADO 🔕'}
     try:
-        nuevo = billing_service.toggle_avisos(tenant_id)
+        modo = billing_service.set_aviso_modo(tenant_id, request.form.get('modo'))
         billing_service.sync_billing_to_tenant(tenant_id)
-        flash('Aviso de vencimiento ' + ('SILENCIADO 🔕' if nuevo else 'ACTIVADO 🔔')
+        flash('Aviso de vencimiento: ' + etiqueta.get(modo, modo)
               + ' para este cliente.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error al cambiar el aviso: {exc}', 'error')

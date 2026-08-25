@@ -520,18 +520,25 @@
     <article class="card">
         <h3>Aviso de vencimiento en el panel del cliente</h3>
         <p>
-            {% if billing.avisos_off %}
-            <span class="badge badge-muted">🔕 Silenciado</span> — el cliente <strong>no ve</strong> el aviso de "plan por vencer / vencido".
+            {% if billing.aviso_modo == 'forzar' %}
+            <span class="badge badge-success">📣 Mostrar siempre</span> — el cliente ve el aviso ahora, aunque el plan esté al día.
+            {% elif billing.aviso_modo == 'silenciar' %}
+            <span class="badge badge-muted">🔕 Silenciado</span> — el cliente <strong>no ve</strong> el aviso.
             {% else %}
-            <span class="badge badge-success">🔔 Activo</span> — el cliente ve el aviso cuando el plan está por vencer o vencido.
+            <span class="badge badge-success">🔔 Automático</span> — el cliente ve el aviso 3 días antes de vencer y cuando está vencido.
             {% endif %}
         </p>
-        <form method="post" action="{{ url_for('tenants.billing_avisos_toggle', tenant_id=tenant.id) }}">
-            <button type="submit" class="{% if not billing.avisos_off %}secondary{% endif %}">
-                {% if billing.avisos_off %}🔔 Activar aviso{% else %}🔕 Silenciar aviso{% endif %}
-            </button>
-            <small class="muted">Préndelo o apágalo cuando quieras — funciona aunque el plan esté al día.</small>
-        </form>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            {% for m, txt in [('auto','🔔 Automático'), ('forzar','📣 Mostrar siempre'), ('silenciar','🔕 Silenciar')] %}
+            <form method="post" action="{{ url_for('tenants.billing_aviso_modo', tenant_id=tenant.id) }}" style="margin:0;">
+                <input type="hidden" name="modo" value="{{ m }}">
+                <button type="submit" class="{% if billing.aviso_modo != m %}secondary outline{% endif %}"
+                        {% if billing.aviso_modo == m %}disabled{% endif %}>{{ txt }}</button>
+            </form>
+            {% endfor %}
+        </div>
+        <small class="muted">Automático = a 3 días de vencer o en mora. <strong>Mostrar siempre</strong> lo activás
+            manualmente cuando quieras (aunque esté al día). Silenciar lo apaga por completo.</small>
     </article>
 
     <article class="card">
