@@ -1,4 +1,5 @@
-"""Suspende tenants con +60 días de mora (auto_suspender=TRUE). Para el cron diario.
+"""Suspende tenants morosos según el plazo POR CLIENTE (tenant_billing.dias_suspension;
+backstop 60d) con auto_suspender=TRUE. Para el cron diario.
 
 Uso:
     python tools/revisar_morosos.py            # ejecuta
@@ -22,7 +23,8 @@ def main():
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     pendientes = billing_service.morosos()
     if not pendientes:
-        print(f"[{ts}] Sin morosos elegibles (+{billing_service.MORA_DIAS_SUSPENSION}d).")
+        print(f"[{ts}] Sin morosos elegibles (plazo por cliente; backstop "
+              f"{billing_service.MORA_DIAS_SUSPENSION}d).")
         return
 
     print(f"[{ts}] Morosos elegibles: {len(pendientes)}")

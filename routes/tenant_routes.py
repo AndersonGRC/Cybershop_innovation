@@ -355,6 +355,7 @@ def billing_config(tenant_id):
             auto_suspender=('auto_suspender' in request.form),
             notas=request.form.get('notas'),
             avisos_off=('avisos_off' in request.form),
+            dias_suspension=request.form.get('dias_suspension'),
         )
         billing_service.sync_billing_to_tenant(tenant_id)
         flash('Configuración de cobro guardada.', 'success')

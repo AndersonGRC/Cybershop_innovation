@@ -10,8 +10,25 @@ import datetime
 
 from db import control_plane_cursor
 
-# Tras 2 meses de mora se suspende (configurable).
+# Backstop del control plane: sin días por cliente, se suspende a los 60 días.
 MORA_DIAS_SUSPENSION = 60
+# Plazo por defecto (días tras el vencimiento) cuando el operador NO fijó uno por
+# cliente Y el cliente está en el motor de cobro automático. El operador puede
+# sobrescribirlo por cliente con tenant_billing.dias_suspension.
+DIAS_SUSPENSION_DEFAULT = 30
+
+
+def _parse_dias(v):
+    """Días de plazo -> int>=0 o None (vacío = usar el default)."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    if s == '':
+        return None
+    try:
+        return max(0, int(float(s)))
+    except ValueError:
+        return None
 
 
 # ── utilidades de fecha ────────────────────────────────────────
@@ -54,6 +71,10 @@ def _ensure_tables():
         # Aditivo: silenciar (por tenant) el pop-up de "plan por vencer" del cliente.
         cur.execute("ALTER TABLE tenant_billing "
                     "ADD COLUMN IF NOT EXISTS avisos_off BOOLEAN NOT NULL DEFAULT FALSE")
+        # Aditivo: días de plazo (por cliente) antes de la suspensión automática.
+        # NULL = usar el default (DIAS_SUSPENSION_DEFAULT / MORA_DIAS_SUSPENSION).
+        cur.execute("ALTER TABLE tenant_billing "
+                    "ADD COLUMN IF NOT EXISTS dias_suspension INT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tenant_pagos (
                 id SERIAL PRIMARY KEY,
@@ -93,22 +114,29 @@ def get_billing(tenant_id: int) -> dict:
     proxima = row['proxima_fecha'] if row else None
     auto = bool(row['auto_suspender']) if row else True
     avisos_off = bool(row.get('avisos_off')) if row else False
+    dias_susp = row.get('dias_suspension') if row else None
     estado, dias = _estado(proxima)
+    motor = get_motor_info(tenant_id)
+    # Umbral efectivo: si el operador fijó días por cliente, mandan; si no, 30 para
+    # clientes en el motor (suspensión automática rápida) o el backstop de 60.
+    default_grace = DIAS_SUSPENSION_DEFAULT if motor is not None else MORA_DIAS_SUSPENSION
+    umbral = int(dias_susp) if dias_susp is not None else default_grace
     return {
         'configurado': bool(row),
         'monto_mensual': monto,
         'proxima_fecha': proxima,
         'auto_suspender': auto,
         'avisos_off': avisos_off,
+        'dias_suspension': int(dias_susp) if dias_susp is not None else None,
         'notas': (row['notas'] if row else '') or '',
         'estado': estado,
         'dias': dias,
         'en_mora': estado == 'en_mora',
-        'umbral_suspension': MORA_DIAS_SUSPENSION,
-        'a_suspension': max(0, MORA_DIAS_SUSPENSION - dias) if estado == 'en_mora' else None,
+        'umbral_suspension': umbral,
+        'a_suspension': max(0, umbral - dias) if estado == 'en_mora' else None,
         'ultimo_pago': historial[0] if historial else None,
         'historial': historial,
-        'motor': get_motor_info(tenant_id),
+        'motor': motor,
     }
 
 
@@ -155,8 +183,9 @@ def get_motor_info(tenant_id: int):
 
 # ── escritura ──────────────────────────────────────────────────
 def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender=None,
-               notas=None, avisos_off=None):
-    """Upsert de la configuración de cobro (solo toca lo que no es None)."""
+               notas=None, avisos_off=None, dias_suspension=None):
+    """Upsert de la configuración de cobro (solo toca lo que no es None).
+    `dias_suspension` vacío ('') => NULL (usar el default)."""
     _ensure_tables()
     monto = None
     if monto_mensual is not None and str(monto_mensual).strip() != '':
@@ -170,9 +199,9 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
         existe = cur.fetchone() is not None
         if not existe:
             cur.execute(
-                "INSERT INTO tenant_billing (tenant_id, monto_mensual, proxima_fecha, auto_suspender, notas) "
-                "VALUES (%s, COALESCE(%s,0), %s, COALESCE(%s,TRUE), %s)",
-                (tenant_id, monto, pf, auto_suspender, notas))
+                "INSERT INTO tenant_billing (tenant_id, monto_mensual, proxima_fecha, auto_suspender, notas, dias_suspension) "
+                "VALUES (%s, COALESCE(%s,0), %s, COALESCE(%s,TRUE), %s, %s)",
+                (tenant_id, monto, pf, auto_suspender, notas, _parse_dias(dias_suspension)))
             return
         sets, params = [], []
         if monto is not None:
@@ -185,6 +214,8 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
             sets.append("notas = %s"); params.append(notas)
         if avisos_off is not None:
             sets.append("avisos_off = %s"); params.append(bool(avisos_off))
+        if dias_suspension is not None:
+            sets.append("dias_suspension = %s"); params.append(_parse_dias(dias_suspension))
         if not sets:
             return
         sets.append("updated_at = NOW()")
@@ -302,26 +333,43 @@ def extender_plazo(tenant_id, dias=None, nueva_fecha=None):
 
 
 # ── morosos / auto-suspensión ─────────────────────────────────
-def morosos(dias=MORA_DIAS_SUSPENSION):
-    """Tenants ACTIVOS, con auto_suspender=TRUE y +`dias` de mora."""
+def morosos(dias=None):
+    """Tenants ACTIVOS, con auto_suspender=TRUE y suficiente mora para suspender.
+    `dias=None` (default) usa el plazo POR CLIENTE (tenant_billing.dias_suspension)
+    con fallback al backstop de 60. Si se pasa `dias`, se aplica ese umbral fijo a
+    todos (compatibilidad)."""
     _ensure_tables()
-    limite = _today() - datetime.timedelta(days=dias)
     with control_plane_cursor(dict_cursor=True) as cur:
-        cur.execute("""
-            SELECT t.id, t.slug, t.nombre, b.proxima_fecha,
-                   (CURRENT_DATE - b.proxima_fecha) AS dias_mora
-            FROM tenant_billing b
-            JOIN tenants t ON t.id = b.tenant_id
-            WHERE b.auto_suspender = TRUE
-              AND b.proxima_fecha IS NOT NULL
-              AND b.proxima_fecha < %s
-              AND t.estado = 'activo'
-            ORDER BY b.proxima_fecha ASC
-        """, (limite,))
+        if dias is None:
+            cur.execute("""
+                SELECT t.id, t.slug, t.nombre, b.proxima_fecha,
+                       (CURRENT_DATE - b.proxima_fecha) AS dias_mora,
+                       COALESCE(b.dias_suspension, %s) AS umbral
+                FROM tenant_billing b
+                JOIN tenants t ON t.id = b.tenant_id
+                WHERE b.auto_suspender = TRUE
+                  AND b.proxima_fecha IS NOT NULL
+                  AND t.estado = 'activo'
+                  AND (CURRENT_DATE - b.proxima_fecha) >= COALESCE(b.dias_suspension, %s)
+                ORDER BY b.proxima_fecha ASC
+            """, (MORA_DIAS_SUSPENSION, MORA_DIAS_SUSPENSION))
+        else:
+            limite = _today() - datetime.timedelta(days=dias)
+            cur.execute("""
+                SELECT t.id, t.slug, t.nombre, b.proxima_fecha,
+                       (CURRENT_DATE - b.proxima_fecha) AS dias_mora
+                FROM tenant_billing b
+                JOIN tenants t ON t.id = b.tenant_id
+                WHERE b.auto_suspender = TRUE
+                  AND b.proxima_fecha IS NOT NULL
+                  AND b.proxima_fecha < %s
+                  AND t.estado = 'activo'
+                ORDER BY b.proxima_fecha ASC
+            """, (limite,))
         return cur.fetchall()
 
 
-def revisar_y_suspender(dias=MORA_DIAS_SUSPENSION, por='cron'):
+def revisar_y_suspender(dias=None, por='cron'):
     """Suspende a los morosos elegibles. Devuelve la lista suspendida."""
     import lifecycle_service
     pendientes = morosos(dias)

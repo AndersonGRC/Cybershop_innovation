@@ -524,7 +524,19 @@
                 <label>Monto mensual <input type="text" name="monto_mensual" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}"></label>
                 <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}"></label>
             </div>
-            <label><input type="checkbox" name="auto_suspender" {% if billing.auto_suspender %}checked{% endif %}> Auto-suspender tras {{ billing.umbral_suspension }} días de mora</label>
+            <div class="grid-2">
+                <label>Días de plazo antes de suspender
+                    <input type="number" name="dias_suspension" min="0" max="365"
+                           value="{{ billing.dias_suspension if billing.dias_suspension is not none else '' }}"
+                           placeholder="por defecto {{ billing.umbral_suspension }}">
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" name="auto_suspender" {% if billing.auto_suspender %}checked{% endif %}>
+                    Auto-suspender por mora
+                </label>
+            </div>
+            <small class="muted">Tras el vencimiento, el sistema espera <strong>estos días</strong> antes de suspender.
+                Vacío = {{ billing.umbral_suspension }} días (por defecto). Tú controlas el plazo por cliente.</small>
             <label><input type="checkbox" name="avisos_off" {% if billing.avisos_off %}checked{% endif %}> Silenciar el aviso de "plan por vencer" en el panel del cliente</label>
             <label>Notas <input type="text" name="notas" value="{{ billing.notas }}"></label>
             <button type="submit">Guardar configuración</button>
