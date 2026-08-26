@@ -153,7 +153,7 @@ def _run(cmd):
 #   changes -> lista los archivos que cambiarían respecto a origin/master (no muta)
 #   apply   -> git merge --ff-only origin/master (nunca hace merge ni pisa locales)
 # El código es COMPARTIDO por todas las instancias; cada cliente carga el nuevo
-# código al reiniciar su instancia. Las mejoras del app (después del login) y de
+# código al recargar su instancia. Las mejoras del app (después del login) y de
 # seguridad/backend fluyen; los cambios del SITIO PÚBLICO (antes del login) se
 # BLOQUEAN salvo include_public=True, para no soltarlos a los clientes sin querer.
 DEPLOY_SCRIPT = '/usr/local/bin/cybershop-deploy-code.sh'
@@ -251,8 +251,26 @@ def enable_service(slug):
 def restart_service(slug):
     if not IS_LINUX:
         return 'skipped (no-linux)'
-    _run(SUDO + [SYSTEMCTL, 'restart', service_unit(slug)])
+    result = _run(SUDO + [SYSTEMCTL, 'restart', service_unit(slug)])
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or 'sin detalle').strip()
+        raise RuntimeError(f'No se pudo reiniciar {service_unit(slug)}: {detail}')
     return 'restarted'
+
+
+def reload_service(slug):
+    """Ejecuta el rolling reload configurado en systemd para código/plantillas.
+
+    No usar después de modificar el EnvironmentFile, el venv o el unit: esos
+    casos deben seguir pasando por ``restart_service``.
+    """
+    if not IS_LINUX:
+        return 'skipped (no-linux)'
+    result = _run(SUDO + [SYSTEMCTL, 'reload', service_unit(slug)])
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or 'sin detalle').strip()
+        raise RuntimeError(f'No se pudo recargar {service_unit(slug)}: {detail}')
+    return 'reloaded'
 
 
 def stop_service(slug):

@@ -13,6 +13,13 @@ if not exist "venv\Scripts\python.exe" (
   call ".\venv\Scripts\activate.bat"
 )
 
+python -c "import flask_wtf" >nul 2>nul
+if errorlevel 1 (
+  echo Instalando dependencias nuevas del panel...
+  python -m pip install -r requirements.txt
+  if errorlevel 1 exit /b 1
+)
+
 if not exist ".cybershop.conf" (
   echo.
   echo ERROR: falta .cybershop.conf

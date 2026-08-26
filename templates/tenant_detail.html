@@ -669,7 +669,7 @@
 
         <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap; align-items:center;">
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
-                  onsubmit="return confirm('Trae las mejoras FUNCIONALES (después del login) + seguridad/backend, migra la BD (aditivo) y reinicia. Se BLOQUEA si hay cambios del sitio público pendientes. NO toca datos del cliente. ¿Continuar?')">
+                  onsubmit="return confirm('Trae las mejoras FUNCIONALES (después del login) + seguridad/backend, migra la BD (aditivo) y recarga workers sin corte. Se BLOQUEA si hay cambios del sitio público pendientes. NO usar si cambiaron dependencias o variables de entorno. ¿Continuar?')">
                 <input type="hidden" name="accion" value="update">
                 <button class="btn-small" type="submit">⬆ Actualizar app (después del login)</button>
             </form>
@@ -702,9 +702,11 @@
         <p style="margin:.5rem 0 0;"><small class="muted">
             <strong>Actualizar app (después del login)</strong>: replica las mejoras funcionales y de
             seguridad — trae el código compartido (se <strong>bloquea si hay cambios del sitio público
-            pendientes</strong>), migra la BD (aditivo, no borra datos) y reinicia la instancia.
+            pendientes</strong>), migra la BD (aditivo, no borra datos) y recarga la instancia sin corte.
             <strong>Nunca modifica el sitio público ni los datos del cliente</strong> (colores, logo,
             secciones y datos de empresa son propios de cada cliente).
+            Si cambiaron dependencias, variables de entorno o el unit systemd, se requiere el
+            procedimiento controlado de reinicio en vez de este botón.
             <strong>Deploy completo</strong>: úsalo solo cuando quieras publicar también cambios del
             sitio público (antes del login).
         </small></p>

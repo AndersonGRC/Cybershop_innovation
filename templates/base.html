@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}CyberShop Admin{% endblock %}</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
@@ -46,5 +47,29 @@
     <footer class="container">
         <small>CyberShop Admin · panel SaaS</small>
     </footer>
+    <script>
+    (function () {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (!meta) return;
+        var token = meta.getAttribute('content');
+
+        // Compatibilidad con los formularios existentes: se añade el token a
+        // todo POST sin tener que alterar sus campos de negocio.
+        document.querySelectorAll('form').forEach(function (form) {
+            if ((form.method || '').toLowerCase() !== 'post') return;
+            if (form.querySelector('input[name="csrf_token"]')) return;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = token;
+            form.appendChild(input);
+        });
+
+        // Preparado para cualquier POST futuro realizado mediante HTMX.
+        document.body.addEventListener('htmx:configRequest', function (event) {
+            event.detail.headers['X-CSRFToken'] = token;
+        });
+    })();
+    </script>
 </body>
 </html>

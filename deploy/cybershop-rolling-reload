@@ -1,0 +1,150 @@
+#!/bin/bash
+set -euo pipefail
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+main_pid="${1:-}"
+listen_port="${2:-5001}"
+if [[ ! "$main_pid" =~ ^[1-9][0-9]*$ ]] || ! kill -0 "$main_pid" 2>/dev/null; then
+    echo "PID maestro inválido o inactivo: $main_pid" >&2
+    exit 2
+fi
+if [[ ! "$listen_port" =~ ^[1-9][0-9]*$ ]] || [ "$listen_port" -gt 65535 ]; then
+    echo "Puerto inválido: $listen_port" >&2
+    exit 10
+fi
+
+children() {
+    pgrep -P "$main_pid" | sort -n || true
+}
+
+child_count() {
+    children | wc -l
+}
+
+initial_workers="$(children)"
+initial_count="$(printf '%s\n' "$initial_workers" | sed '/^$/d' | wc -l)"
+if [ "$initial_count" -lt 1 ]; then
+    echo "Gunicorn no tiene workers antes del reload" >&2
+    exit 3
+fi
+
+scaled_up=0
+paused_worker=""
+old_worker=""
+restore_worker_count() {
+    if [ -n "$paused_worker" ]; then
+        kill -CONT "$paused_worker" 2>/dev/null || true
+        paused_worker=""
+    fi
+    if [ "$scaled_up" -eq 1 ] && [ -n "$old_worker" ] \
+            && kill -0 "$main_pid" 2>/dev/null; then
+        for _rollback_drain in $(seq 1 40); do
+            kill -STOP "$old_worker" 2>/dev/null || break
+            if ! ss -ntp state connected "sport = :$listen_port" 2>/dev/null \
+                    | grep -q "pid=$old_worker,"; then
+                kill -TTOU "$main_pid" 2>/dev/null || true
+                kill -CONT "$old_worker" 2>/dev/null || true
+                return
+            fi
+            kill -CONT "$old_worker" 2>/dev/null || true
+            sleep 0.1
+        done
+        kill -CONT "$old_worker" 2>/dev/null || true
+        echo "Aviso: se conserva el worker adicional tras el fallo para no cortar tráfico" >&2
+    fi
+}
+trap restore_worker_count EXIT
+
+for _replacement in $(seq 1 "$initial_count"); do
+    old_worker="$(sed -n "${_replacement}p" <<<"$initial_workers")"
+    before_workers="$(children)"
+    kill -TTIN "$main_pid"
+    scaled_up=1
+
+    new_worker=""
+    for _spawn_wait in $(seq 1 80); do
+        while IFS= read -r candidate; do
+            [ -n "$candidate" ] || continue
+            if ! grep -qx "$candidate" <<<"$before_workers"; then
+                new_worker="$candidate"
+                break
+            fi
+        done <<<"$(children)"
+        if [ -n "$new_worker" ] && [ "$(child_count)" -ge "$((initial_count + 1))" ]; then
+            break
+        fi
+        sleep 0.25
+    done
+
+    if [ -z "$new_worker" ]; then
+        echo "No apareció el worker de reemplazo" >&2
+        exit 4
+    fi
+
+    # La importación de CyberShop tarda aproximadamente 3 s en este servidor.
+    # Este margen ocurre mientras todos los workers anteriores siguen activos.
+    sleep 5
+    if ! kill -0 "$new_worker" 2>/dev/null; then
+        echo "El worker nuevo $new_worker terminó durante el arranque" >&2
+        exit 5
+    fi
+    if ! curl -fsS --max-time 10 "http://127.0.0.1:$listen_port/api/v1/health" >/dev/null; then
+        echo "El health local falló antes de retirar un worker antiguo" >&2
+        exit 6
+    fi
+
+    # Gunicorn gthread puede haber aceptado un socket que todavía no llegó al
+    # pool. Pausarlo impide nuevas aceptaciones; solo se retira cuando no tiene
+    # conexiones establecidas, evitando resets de upstream durante TTOU.
+    drained=0
+    for _drain_wait in $(seq 1 80); do
+        kill -STOP "$old_worker"
+        paused_worker="$old_worker"
+        sleep 0.05
+        if ! ss -ntp state connected "sport = :$listen_port" 2>/dev/null \
+                | grep -q "pid=$old_worker,"; then
+            drained=1
+            break
+        fi
+        kill -CONT "$old_worker"
+        paused_worker=""
+        sleep 0.1
+    done
+    if [ "$drained" -ne 1 ]; then
+        echo "No se pudo drenar el worker antiguo $old_worker" >&2
+        exit 9
+    fi
+
+    # Gunicorn ordena por edad y TTOU retira el worker más antiguo. El worker
+    # ya drenado recibe QUIT mientras sigue pausado; al continuar, el handler
+    # sale con código 0 sin reingresar al event loop ni aceptar otro socket.
+    kill -TTOU "$main_pid"
+    scaled_up=0
+    sleep 0.5
+    kill -QUIT "$old_worker" 2>/dev/null || true
+    kill -CONT "$old_worker" 2>/dev/null || true
+    paused_worker=""
+    for _retire_wait in $(seq 1 80); do
+        if [ "$(child_count)" -eq "$initial_count" ]; then
+            break
+        fi
+        sleep 0.25
+    done
+    if [ "$(child_count)" -ne "$initial_count" ]; then
+        echo "El número de workers no volvió a $initial_count" >&2
+        exit 7
+    fi
+done
+
+final_workers="$(children)"
+while IFS= read -r old_worker; do
+    [ -n "$old_worker" ] || continue
+    if grep -qx "$old_worker" <<<"$final_workers"; then
+        echo "El worker antiguo $old_worker no fue reemplazado" >&2
+        exit 8
+    fi
+done <<<"$initial_workers"
+
+curl -fsS --max-time 10 "http://127.0.0.1:$listen_port/api/v1/health" >/dev/null
+trap - EXIT

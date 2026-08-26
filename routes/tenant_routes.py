@@ -670,7 +670,8 @@ def instancia_accion(tenant_id):
             #      (deploy_code); si hay cambios públicos y no include_public → BLOQUEA;
             #   2) migrar estructura de su BD (aditivo — no toca cliente_config /
             #      public_site_settings / config_secciones, que son SUS datos);
-            #   3) reiniciar su instancia para que cargue el código nuevo.
+            #   3) recargar workers con SIGHUP para que carguen el código nuevo
+            #      sin cortar peticiones. Env/venv/unit requieren restart aparte.
             # "Deploy completo" (include_public=1) trae también el sitio público.
             import tenant_migrations as tm
             include_public = bool(request.form.get('include_public'))
@@ -679,14 +680,14 @@ def instancia_accion(tenant_id):
                 flash("No se actualizó (nada se aplicó): " + msg_deploy, 'warning')
             elif status == 'error':
                 flash("Error trayendo el código: " + msg_deploy
-                      + " — no se migró ni reinició.", 'error')
-            else:  # 'updated' | 'uptodate' → migrar (aditivo) + reiniciar
+                      + " — no se migró ni recargó.", 'error')
+            else:  # 'updated' | 'uptodate' → migrar (aditivo) + reload graceful
                 partes = [f"código: {msg_deploy}"]
                 applied = tm.migrate_db(tenant['db_name'])
                 partes.append(f"{len(applied)} migración(es) de BD" if applied else "BD ya al día")
                 billing_service.sync_billing_to_tenant(tenant_id)  # refresca aviso de vencimiento
-                prov.restart_service(tenant['slug'])
-                partes.append("instancia reiniciada" if prov.IS_LINUX else "reinicio omitido (dev)")
+                prov.reload_service(tenant['slug'])
+                partes.append("instancia recargada sin corte" if prov.IS_LINUX else "reload omitido (dev)")
                 flash("Cliente actualizado: " + "; ".join(partes)
                       + ". Su sitio público (colores, logo, secciones, datos) quedó intacto.",
                       'success')

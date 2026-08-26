@@ -4,6 +4,7 @@
 # integraciones...). El código es COMPARTIDO en APP_DIR; el env diferencia al cliente
 # y SOBREESCRIBE el .cybershop.conf compartido (load_dotenv override=False).
 #
+# Instalar también deploy/cybershop-rolling-reload en /usr/local/sbin/.
 # Copiar a /etc/systemd/system/cybershop@.service y ajustar APP_DIR/usuario.
 
 [Unit]
@@ -24,7 +25,7 @@ ExecStart=/var/www/CyberShop/app/env/bin/gunicorn \
     --bind 127.0.0.1:${PORT} \
     --timeout 120 \
     app:app
-ExecReload=/bin/kill -s HUP $MAINPID
+ExecReload=/usr/local/sbin/cybershop-rolling-reload $MAINPID $PORT
 Restart=on-failure
 RestartSec=5
 

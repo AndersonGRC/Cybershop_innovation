@@ -17,7 +17,8 @@ os.environ['TZ'] = os.getenv('MASTER_TIMEZONE', 'America/Bogota')
 if hasattr(_time, 'tzset'):
     _time.tzset()
 
-from flask import Flask, redirect, url_for, g
+from flask import Flask, redirect, url_for, g, jsonify, request
+from flask_wtf.csrf import CSRFError, CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
@@ -25,9 +26,13 @@ from routes import register_blueprints
 from auth import current_admin
 
 
+csrf = CSRFProtect()
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+    csrf.init_app(app)
 
     # Confiar en X-Forwarded-* de Nginx (en prod)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -40,6 +45,12 @@ def create_app() -> Flask:
     )
 
     register_blueprints(app)
+
+    # API servidor-a-servidor: no usa cookies de navegador y autentica cada
+    # request con X-Internal-Key. Mantenerla exenta evita romper la venta
+    # automática; el resto del panel, incluido /autorizar-ip, sí exige CSRF.
+    from routes.internal_api import bp as internal_api_bp
+    csrf.exempt(internal_api_bp)
 
     # Inyectar admin actual en templates
     @app.context_processor
@@ -56,6 +67,13 @@ def create_app() -> Flask:
     @app.errorhandler(404)
     def not_found(_e):
         return 'Página no encontrada', 404
+
+    @app.errorhandler(CSRFError)
+    def csrf_error(_e):
+        if request.is_json or request.path.startswith('/internal/'):
+            return jsonify({'error': 'Token CSRF inválido o ausente'}), 400
+        return ('Solicitud inválida o sesión vencida. Recarga la página e '
+                'inténtalo nuevamente.', 400)
 
     @app.errorhandler(500)
     def server_error(_e):

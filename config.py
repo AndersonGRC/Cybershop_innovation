@@ -18,6 +18,10 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600 * 8  # 8 horas
+    # El token CSRF dura lo mismo que la sesión del maestro. Así una pestaña
+    # abierta no deja de funcionar a la hora, pero el token sigue ligado a la
+    # cookie de sesión y se invalida al cerrar sesión.
+    WTF_CSRF_TIME_LIMIT = 3600 * 8
 
     # --- Server ---
     PORT = int(os.getenv('PORT', '5002'))

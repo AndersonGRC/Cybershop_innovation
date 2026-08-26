@@ -8,10 +8,12 @@ acumular IPs viejas indefinidamente.
 """
 
 import ipaddress
+import html
 import subprocess
 from pathlib import Path
 
 from flask import Blueprint, request
+from flask_wtf.csrf import generate_csrf
 
 bp = Blueprint('ip_self', __name__)
 
@@ -79,12 +81,14 @@ def _render(body: str) -> str:
 def autorizar_form():
     ip = _client_ip()
     ya = ip in _read_ips()
+    csrf_token = html.escape(generate_csrf(), quote=True)
     body = ("<h1>Autorizar mi acceso al panel</h1>"
             "<p>Tu IP pública detectada:</p>"
             f"<p><code>{ip or 'desconocida'}</code></p>")
     if ya:
         body += "<p class=ok>✓ Esta IP ya está autorizada.</p>"
-    body += ("<form method=post><button type=submit>Autorizar esta IP</button></form>"
+    body += (f"<form method=post><input type=hidden name=csrf_token value='{csrf_token}'>"
+             "<button type=submit>Autorizar esta IP</button></form>"
              "<p class=muted>Se agrega al filtro del panel y podrás entrar en "
              "admin.cybershopcol.com. Solo se autoriza la IP desde la que estás "
              "conectada ahora.</p>")

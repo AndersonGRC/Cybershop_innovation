@@ -13,6 +13,7 @@
 
     {% if use_pin %}
     <form method="post" id="pin-form" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
         <input type="password" id="pin" name="pin" inputmode="numeric" pattern="[0-9]*"
                class="pin-display" placeholder="••••" autofocus {% if locked %}disabled{% endif %}>
@@ -31,6 +32,7 @@
     </form>
     {% else %}
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
         <label for="email">Email
             <input type="email" id="email" name="email" required autofocus autocomplete="username">
