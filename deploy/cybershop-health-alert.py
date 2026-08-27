@@ -1,8 +1,10 @@
 #!/var/www/CyberShop/app/env/bin/python
-"""Corre cybershop-health.sh; si hay PROBLEMAS DUROS (exit != 0) alerta por email
-(Gmail del operador) con throttle de 1 hora. Pensado para cron.
+"""Corre cybershop-health.sh y alerta por email (Gmail del operador) SOLO cuando
+aparece un problema DURO NUEVO respecto a la última alerta (alert-on-change), para
+no paginar cada 10 min por un problema ya conocido. Un problema persistente se
+re-notifica pasadas REALERT_H horas. Pensado para cron.
 
-Read-only salvo por (a) el email de alerta y (b) el archivo de estado del throttle.
+Read-only salvo (a) el email de alerta y (b) el archivo de estado.
 Los warnings (p.ej. demo con home 503) NO paginan."""
 import os
 import subprocess
@@ -10,9 +12,26 @@ import sys
 import time
 
 HEALTH = "/usr/local/sbin/cybershop-health.sh"
-STATE = "/var/lib/cybershop/health_last_alert"
-THROTTLE = 3600  # como máximo 1 alerta por hora
+STATE = "/var/lib/cybershop/health_alert_state"   # líneas "✗ ..." de la última alerta
+TS = "/var/lib/cybershop/health_alert_ts"          # epoch de la última alerta
+REALERT_H = 12                                      # re-notifica un problema persistente cada 12h
 APP_DIR = "/var/www/CyberShop/app"
+
+
+def _bad_lines(report):
+    return sorted(l.strip() for l in report.splitlines() if l.strip().startswith("✗"))
+
+
+def _load(path):
+    try:
+        return open(path).read()
+    except Exception:
+        return ""
+
+
+def _save(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, "w").write(text)
 
 
 def main():
@@ -23,19 +42,26 @@ def main():
         return
     report = (r.stdout or "") + (("\n[stderr]\n" + r.stderr) if r.stderr else "")
     print(report)
-    if r.returncode == 0:
-        return  # sin problemas duros
 
-    now = int(time.time())
-    last = 0
-    try:
-        last = int(open(STATE).read().strip())
-    except Exception:
-        pass
-    if now - last < THROTTLE:
-        print("(throttle: alerta enviada hace <1h, no reenvío)")
+    current = _bad_lines(report)
+    if not current:
+        _save(STATE, "")           # todo bien: limpia el estado
         return
 
+    last = [l for l in _load(STATE).splitlines() if l.strip()]
+    nuevos = [x for x in current if x not in last]
+    try:
+        last_ts = int(_load(TS).strip())
+    except Exception:
+        last_ts = 0
+    persistente_reenvio = (time.time() - last_ts) > REALERT_H * 3600
+
+    if not nuevos and not persistente_reenvio:
+        _save(STATE, "\n".join(current))   # refresca estado (p.ej. si algo se resolvió)
+        print("(sin problemas nuevos; no re-notifico)")
+        return
+
+    # Hay problema nuevo (o persistente > REALERT_H): alertar.
     sys.path.insert(0, APP_DIR)
     os.chdir(APP_DIR)
     try:
@@ -45,8 +71,8 @@ def main():
             from helpers_gmail import enviar_email_gmail
             dest = Config.MAIL_USERNAME
             enviar_email_gmail(dest, "⚠️ CyberShop — problema de salud detectado", report)
-        os.makedirs(os.path.dirname(STATE), exist_ok=True)
-        open(STATE, "w").write(str(now))
+        _save(STATE, "\n".join(current))
+        _save(TS, str(int(time.time())))
         print(f"(alerta enviada a {dest})")
     except Exception as e:  # noqa: BLE001
         print(f"(no se pudo enviar la alerta por email: {e})")
