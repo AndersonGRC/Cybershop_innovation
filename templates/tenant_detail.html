@@ -617,6 +617,30 @@
     </article>
 
     <article class="card">
+        <h3>🧾 Auditoría de acciones sensibles</h3>
+        <p><small class="muted">Últimas suspensiones, reactivaciones, destrucciones, pagos y cambios del aviso — con <strong>quién/qué</strong> (fADMIN, motor, morosos, pago) y <strong>cuándo</strong>. Registro append-only.</small></p>
+        {% if auditoria %}
+        <figure>
+        <table>
+            <thead><tr><th>Fecha (UTC-5)</th><th>Acción</th><th>Actor</th><th>Detalle</th></tr></thead>
+            <tbody>
+            {% for a in auditoria %}
+            <tr>
+                <td>{{ a.ts.strftime('%Y-%m-%d %H:%M') if a.ts else '' }}</td>
+                <td><code>{{ a.accion }}</code></td>
+                <td>{{ a.actor }}</td>
+                <td><small class="muted">{{ a.detalle or '' }}</small></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </figure>
+        {% else %}
+        <p><span class="badge badge-muted">Sin registros aún</span></p>
+        {% endif %}
+    </article>
+
+    <article class="card">
         <h3>Instancia y dominio</h3>
 
         <div class="dns-hint">

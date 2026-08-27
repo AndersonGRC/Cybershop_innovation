@@ -12,6 +12,7 @@ import client_config_service as ccs
 import module_service as ms
 import integrations_service as ints
 import billing_service
+import audit_service
 import timezone_service as tzs
 from tenant_service import TenantCreationError
 
@@ -245,6 +246,7 @@ def detail(tenant_id):
         site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
         billing=billing,
+        auditoria=audit_service.listar(tenant_id, 30),
         timezones=tzs.TIMEZONES, tz_actual=tz_actual,
     )
 
