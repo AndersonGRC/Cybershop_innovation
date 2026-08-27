@@ -1,0 +1,8 @@
+# CyberShop — monitor de salud de la flota + alerta por email (cada 10 min).
+# Instalar como /etc/cron.d/cybershop-health. Requiere:
+#   /usr/local/sbin/cybershop-health.sh  y  /usr/local/sbin/cybershop-health-alert.py
+# Solo paginan los problemas DUROS (instancia caída, health!=200, Postgres, disco,
+# o un cron de cobro que falló en su última corrida). Throttle: 1 alerta/hora.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/10 * * * * root /var/www/CyberShop/app/env/bin/python /usr/local/sbin/cybershop-health-alert.py >> /var/log/cybershop-health.log 2>&1

@@ -10,9 +10,11 @@
 set -uo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-PROBLEMS=0
+PROBLEMS=0   # duros → paginan (exit != 0)
+WARN=0       # blandos → se reportan, no paginan
 ok(){   echo "  ✓ $*"; }
 bad(){  echo "  ✗ $*"; PROBLEMS=$((PROBLEMS+1)); }
+warn(){ echo "  ⚠ $*"; WARN=$((WARN+1)); }
 
 echo "=== CyberShop · salud de la flota · $(date -u +%FT%TZ) ==="
 
@@ -41,7 +43,7 @@ for U in $(systemctl list-units --type=service --state=active --no-legend 'cyber
   info="$slug estado=$st puerto=${PORT:-?} health=$hc home=$home"
   if [ "$st" != "active" ]; then bad "$info (inactiva)"
   elif [ "$hc" != "200" ]; then bad "$info (app no responde /api/v1/health)"
-  elif [ "$home" != "200" ] && [ "$home" != "302" ]; then bad "$info (home anómalo)"
+  elif [ "$home" != "200" ] && [ "$home" != "302" ]; then warn "$info (home anómalo; app OK vía health)"
   else ok "$info"; fi
 done
 
@@ -49,8 +51,12 @@ done
 echo "-- crons de cobro --"
 for L in /var/log/cybershop-billing.log /var/log/cybershop-morosos.log; do
   [ -f "$L" ] || { echo "  (sin log $L)"; continue; }
-  err=$(tail -n 200 "$L" 2>/dev/null | grep -iE "traceback|exception|error|falló|failed" | tail -2)
-  [ -n "$err" ] && bad "$(basename "$L"): $(tr '\n' '|' <<<"$err")" || ok "$(basename "$L") sin errores recientes"
+  # Solo la ÚLTIMA corrida (desde la última línea con fecha [YYYY-...]) para evitar
+  # ruido histórico; una corrida con error es un problema DURO (cron roto).
+  ln=$(grep -nE '^\[20[0-9][0-9]-' "$L" 2>/dev/null | tail -1 | cut -d: -f1)
+  blk=$([ -n "$ln" ] && tail -n +"$ln" "$L" || tail -n 50 "$L")
+  err=$(grep -iE "traceback|exception|\[!\]|falló|failed" <<<"$blk" | head -2)
+  [ -n "$err" ] && bad "$(basename "$L") (última corrida): $(tr '\n' '|' <<<"$err")" || ok "$(basename "$L") última corrida limpia"
 done
 
 # 4) Disco
@@ -62,5 +68,6 @@ df -P / | awk 'NR>1{ if ($5+0>=90) exit 1 }' || bad "disco / >= 90%"
 echo "-- postgres --"
 sudo -u postgres psql -tAc "SELECT 1" >/dev/null 2>&1 && ok "postgres responde" || bad "postgres NO responde"
 
-echo "=== problemas detectados: $PROBLEMS ==="
+echo "=== problemas(P)=$PROBLEMS  warnings(W)=$WARN ==="
+# Exit != 0 SOLO por problemas duros (los warnings no paginan).
 [ "$PROBLEMS" -eq 0 ]
