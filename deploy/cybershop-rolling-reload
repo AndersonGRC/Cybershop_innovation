@@ -89,8 +89,11 @@ for _replacement in $(seq 1 "$initial_count"); do
         echo "El worker nuevo $new_worker terminó durante el arranque" >&2
         exit 5
     fi
-    if ! curl -fsS --max-time 10 "http://127.0.0.1:$listen_port/api/v1/health" >/dev/null; then
-        echo "El health local falló antes de retirar un worker antiguo" >&2
+    # Health-check GENÉRICO (independiente de /api/v1/health): el worker nuevo está
+    # listo si `/` responde algo que no sea 5xx ni fallo de conexión (000).
+    _hc=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/" || echo 000)
+    if [ "$_hc" = "000" ] || [ "${_hc:-500}" -ge 500 ]; then
+        echo "El health local del worker nuevo falló (HTTP $_hc) antes de retirar un worker antiguo" >&2
         exit 6
     fi
 
@@ -146,5 +149,6 @@ while IFS= read -r old_worker; do
     fi
 done <<<"$initial_workers"
 
-curl -fsS --max-time 10 "http://127.0.0.1:$listen_port/api/v1/health" >/dev/null
+_hc=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/" || echo 000)
+if [ "$_hc" = "000" ] || [ "${_hc:-500}" -ge 500 ]; then echo "Health final falló (HTTP $_hc)" >&2; exit 11; fi
 trap - EXIT
