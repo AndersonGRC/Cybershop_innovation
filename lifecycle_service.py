@@ -19,6 +19,7 @@ from db import get_postgres_admin_conn
 import tenant_service
 import provisioning_service as prov
 import integrations_service as ints
+import audit_service
 
 
 def _pg_dump_bin() -> str:
@@ -63,18 +64,20 @@ def destroy_database(db_name: str):
         conn.close()
 
 
-def suspend(tenant_id: int):
+def suspend(tenant_id: int, actor=None):
     t = tenant_service.get_tenant(tenant_id)
     tenant_service.set_estado(tenant_id, 'suspendido')   # desactiva keys
     prov.stop_service(t['slug'])
     prov.set_status(tenant_id, 'stopped')
+    audit_service.registrar('suspend', tenant_id, actor=actor, detalle=f"slug={t.get('slug')}")
 
 
-def reactivate(tenant_id: int):
+def reactivate(tenant_id: int, actor=None):
     t = tenant_service.get_tenant(tenant_id)
     tenant_service.set_estado(tenant_id, 'activo')
     prov.enable_service(t['slug'])
     prov.set_status(tenant_id, 'running' if prov.IS_LINUX else 'pending')
+    audit_service.registrar('reactivate', tenant_id, actor=actor, detalle=f"slug={t.get('slug')}")
 
 
 def _teardown_runtime(tenant_id, slug):
@@ -87,22 +90,26 @@ def _teardown_runtime(tenant_id, slug):
         prov.remove_site(rt['custom_domain'])
 
 
-def destroy_soft(tenant_id: int) -> str:
+def destroy_soft(tenant_id: int, actor=None) -> str:
     """Backup + apagar + quitar Caddy + estado cancelado. CONSERVA la BD."""
     t = tenant_service.get_tenant(tenant_id)
     backup_path = backup_db(t['slug'], t['db_name'])
     _teardown_runtime(tenant_id, t['slug'])
     tenant_service.set_estado(tenant_id, 'cancelado')
     prov.set_status(tenant_id, 'cancelled')
+    audit_service.registrar('destroy_soft', tenant_id, actor=actor,
+                            detalle=f"slug={t.get('slug')} backup={backup_path}")
     return backup_path
 
 
-def destroy_hard(tenant_id: int) -> str:
+def destroy_hard(tenant_id: int, actor=None) -> str:
     """destroy_soft + DROP DATABASE + borrar el env de la instancia."""
     t = tenant_service.get_tenant(tenant_id)
-    backup_path = destroy_soft(tenant_id)
+    backup_path = destroy_soft(tenant_id, actor=actor)
     destroy_database(t['db_name'])
     env_file = ints.env_path(t['slug'])
     if env_file.exists():
         env_file.unlink()
+    audit_service.registrar('destroy_hard', tenant_id, actor=actor,
+                            detalle=f"slug={t.get('slug')} db={t.get('db_name')} DROP+env borrado")
     return backup_path

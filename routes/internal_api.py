@@ -73,9 +73,9 @@ def _accion_lifecycle(tenant_id, accion):
         return jsonify({'error': 'Tenant no existe'}), 404
     try:
         if accion == 'suspend':
-            lc.suspend(tenant_id)
+            lc.suspend(tenant_id, actor='motor')
         else:
-            lc.reactivate(tenant_id)
+            lc.reactivate(tenant_id, actor='motor')
         return jsonify({'ok': True, 'accion': accion, 'tenant_id': tenant_id}), 200
     except Exception as exc:  # noqa: BLE001
         return jsonify({'error': str(exc)}), 500

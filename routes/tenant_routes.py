@@ -549,10 +549,10 @@ def toggle(tenant_id):
     import lifecycle_service as lc
     try:
         if tenant['estado'] == 'activo':
-            lc.suspend(tenant_id)
+            lc.suspend(tenant_id, actor='fADMIN')
             flash('Cliente suspendido: instancia apagada (no permite ingreso) y API keys desactivadas.', 'success')
         else:
-            lc.reactivate(tenant_id)
+            lc.reactivate(tenant_id, actor='fADMIN')
             flash('Cliente reactivado. Revisá que la instancia esté arriba y reactivá las API keys necesarias.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error cambiando estado: {exc}', 'error')

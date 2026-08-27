@@ -9,6 +9,7 @@ import calendar
 import datetime
 
 from db import control_plane_cursor
+import audit_service
 
 # Backstop del control plane: sin días por cliente, se suspende a los 60 días.
 MORA_DIAS_SUSPENSION = 60
@@ -250,6 +251,7 @@ def set_aviso_modo(tenant_id: int, modo: str) -> str:
         else:
             cur.execute("INSERT INTO tenant_billing (tenant_id, avisos_off, aviso_forzar) "
                         "VALUES (%s, %s, %s)", (tenant_id, off, forzar))
+    audit_service.registrar('aviso_modo', tenant_id, actor='fADMIN', detalle=f"modo={modo}")
     return modo
 
 
@@ -328,9 +330,11 @@ def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registr
     if estado_actual == 'suspendido' and nueva >= _today():
         try:
             import lifecycle_service
-            lifecycle_service.reactivate(tenant_id)
+            lifecycle_service.reactivate(tenant_id, actor='pago')
         except Exception:  # noqa: BLE001
             pass
+    audit_service.registrar('pago', tenant_id, actor=(registrado_por or 'fADMIN'),
+                            detalle=f"monto={monto_f} cubre_hasta={nueva}")
     return nueva
 
 
@@ -408,7 +412,7 @@ def revisar_y_suspender(dias=None, por='cron'):
     suspendidos = []
     for m in pendientes:
         try:
-            lifecycle_service.suspend(m['id'])
+            lifecycle_service.suspend(m['id'], actor=f'morosos:{por}')
             suspendidos.append(m)
         except Exception:  # noqa: BLE001 — no abortar el lote por uno
             continue
