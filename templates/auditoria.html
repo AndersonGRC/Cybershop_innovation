@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Auditoría · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>🧾 Auditoría de acciones sensibles</h1>
+    <p><small class="muted">Últimas 200 acciones de TODOS los clientes: suspensiones, reactivaciones,
+        destrucciones, pagos y cambios de aviso — con <strong>quién/qué</strong> (fADMIN · motor ·
+        morosos · pago) y <strong>cuándo</strong>. Registro append-only (no editable).</small></p>
+</hgroup>
+
+{% if filas %}
+<article class="card">
+<figure>
+<table>
+    <thead>
+        <tr><th>Fecha (UTC-5)</th><th>Acción</th><th>Cliente</th><th>Actor</th><th>Detalle</th></tr>
+    </thead>
+    <tbody>
+        {% for a in filas %}
+        <tr>
+            <td>{{ a.ts.strftime('%Y-%m-%d %H:%M') if a.ts else '' }}</td>
+            <td><code>{{ a.accion }}</code></td>
+            <td>
+                {% if a.tenant_id %}
+                <a href="{{ url_for('tenants.detail', tenant_id=a.tenant_id) }}">{{ a.slug or ('#' ~ a.tenant_id) }}</a>
+                {% else %}—{% endif %}
+            </td>
+            <td>{{ a.actor }}</td>
+            <td><small class="muted">{{ a.detalle or '' }}</small></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+</article>
+{% else %}
+<article class="card"><p><span class="badge badge-muted">Sin registros aún</span></p></article>
+{% endif %}
+
+<p style="margin-top:1rem;">
+    <a href="{{ url_for('dashboard.auditoria') }}" role="button" class="secondary outline">↻ Refrescar</a>
+</p>
+{% endblock %}

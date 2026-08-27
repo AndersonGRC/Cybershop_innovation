@@ -54,3 +54,15 @@ def listar(tenant_id=None, limite=200):
             cur.execute("SELECT id, ts, accion, tenant_id, actor, detalle FROM auditoria_acciones "
                         "ORDER BY ts DESC, id DESC LIMIT %s", (limite,))
         return cur.fetchall()
+
+
+def listar_con_slug(limite=200):
+    """Vista global con el slug del tenant (para la página /auditoria)."""
+    _ensure()
+    with control_plane_cursor(dict_cursor=True) as cur:
+        cur.execute("""
+            SELECT a.id, a.ts, a.accion, a.tenant_id, a.actor, a.detalle, t.slug
+            FROM auditoria_acciones a
+            LEFT JOIN tenants t ON t.id = a.tenant_id
+            ORDER BY a.ts DESC, a.id DESC LIMIT %s""", (limite,))
+        return cur.fetchall()

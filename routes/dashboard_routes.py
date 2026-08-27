@@ -33,3 +33,13 @@ def salud():
     except Exception:  # noqa: BLE001
         pass
     return render_template('salud.html', reporte=reporte, edad=edad)
+
+
+@bp.route('/auditoria')
+@login_required
+def auditoria():
+    """Vista global de acciones sensibles (suspensiones, pagos, avisos…) de todos
+    los clientes. Registro append-only (audit_service)."""
+    import audit_service
+    filas = audit_service.listar_con_slug(limite=200)
+    return render_template('auditoria.html', filas=filas)
