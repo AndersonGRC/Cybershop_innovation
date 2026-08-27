@@ -57,6 +57,11 @@ for L in /var/log/cybershop-billing.log /var/log/cybershop-morosos.log; do
   blk=$([ -n "$ln" ] && tail -n +"$ln" "$L" || tail -n 50 "$L")
   err=$(grep -iE "traceback|exception|\[!\]|falló|failed" <<<"$blk" | head -2)
   [ -n "$err" ] && bad "$(basename "$L") (última corrida): $(tr '\n' '|' <<<"$err")" || ok "$(basename "$L") última corrida limpia"
+  # Liveness: un cron MUERTO no deja errores, solo silencio. Los crons son diarios;
+  # si el log no se actualizó en >30h, probablemente el cron dejó de correr.
+  if find "$L" -mmin +1800 2>/dev/null | grep -q .; then
+    bad "$(basename "$L") no se actualizó en >30h — ¿cron detenido?"
+  fi
 done
 
 # 4) Disco
