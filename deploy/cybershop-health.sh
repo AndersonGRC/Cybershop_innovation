@@ -69,9 +69,11 @@ echo "-- disco --"
 df -hP / /var 2>/dev/null | awk 'NR>1{u=$5+0; s=(u>=90)?"✗":"✓"; print "  "s" "$6" usado "$5} '
 df -P / | awk 'NR>1{ if ($5+0>=90) exit 1 }' || bad "disco / >= 90%"
 
-# 5) Postgres
+# 5) Postgres + control plane (del que dependen fADMIN y el cobro)
 echo "-- postgres --"
 sudo -u postgres psql -tAc "SELECT 1" >/dev/null 2>&1 && ok "postgres responde" || bad "postgres NO responde"
+_tn=$(sudo -u postgres psql -d saas_control_plane -tAc "SELECT COUNT(*) FROM tenants" 2>/dev/null | tr -d '[:space:]')
+if [ -n "$_tn" ]; then ok "control plane (saas_control_plane) OK — $_tn tenants"; else bad "control plane (saas_control_plane) NO consultable"; fi
 
 echo "=== problemas(P)=$PROBLEMS  warnings(W)=$WARN ==="
 # Exit != 0 SOLO por problemas duros (los warnings no paginan).
