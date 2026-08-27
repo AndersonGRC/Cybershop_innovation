@@ -14,6 +14,20 @@ if [[ ! "$listen_port" =~ ^[1-9][0-9]*$ ]] || [ "$listen_port" -gt 65535 ]; then
     exit 10
 fi
 
+# Readiness del worker nuevo. Preferimos /api/v1/health (200 = app sana,
+# independiente del estado del home del tenant, p.ej. un demo que da 503 en "/");
+# si la API está deshabilitada (404), caemos a "/" aceptando cualquier respuesta < 500.
+_hc() {
+    local code
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/api/v1/health" 2>/dev/null || echo 000)
+    if [ "$code" = "200" ]; then return 0; fi
+    if [ "$code" = "404" ]; then
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/" 2>/dev/null || echo 000)
+        if [ "$code" != "000" ] && [ "${code:-500}" -lt 500 ]; then return 0; fi
+    fi
+    return 1
+}
+
 children() {
     pgrep -P "$main_pid" | sort -n || true
 }
@@ -89,11 +103,9 @@ for _replacement in $(seq 1 "$initial_count"); do
         echo "El worker nuevo $new_worker terminó durante el arranque" >&2
         exit 5
     fi
-    # Health-check GENÉRICO (independiente de /api/v1/health): el worker nuevo está
-    # listo si `/` responde algo que no sea 5xx ni fallo de conexión (000).
-    _hc=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/" || echo 000)
-    if [ "$_hc" = "000" ] || [ "${_hc:-500}" -ge 500 ]; then
-        echo "El health local del worker nuevo falló (HTTP $_hc) antes de retirar un worker antiguo" >&2
+    # Readiness del worker nuevo (ver _hc): /api/v1/health 200, o "/" < 500 de fallback.
+    if ! _hc; then
+        echo "El health local del worker nuevo falló antes de retirar un worker antiguo" >&2
         exit 6
     fi
 
@@ -149,6 +161,5 @@ while IFS= read -r old_worker; do
     fi
 done <<<"$initial_workers"
 
-_hc=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$listen_port/" || echo 000)
-if [ "$_hc" = "000" ] || [ "${_hc:-500}" -ge 500 ]; then echo "Health final falló (HTTP $_hc)" >&2; exit 11; fi
+_hc || { echo "Health final falló" >&2; exit 11; }
 trap - EXIT
