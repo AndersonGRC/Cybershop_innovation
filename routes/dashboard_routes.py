@@ -14,3 +14,22 @@ bp = Blueprint('dashboard', __name__)
 def index():
     stats = tenant_service.dashboard_stats()
     return render_template('dashboard.html', stats=stats)
+
+
+@bp.route('/salud')
+@login_required
+def salud():
+    """Muestra el último resultado del monitor de salud de la flota (lo escribe el
+    cron cada ~10 min en /var/lib/cybershop/health_last.txt)."""
+    import os
+    import time
+    path = '/var/lib/cybershop/health_last.txt'
+    reporte = None
+    edad = None
+    try:
+        with open(path, encoding='utf-8', errors='replace') as f:
+            reporte = f.read()
+        edad = int(time.time() - os.path.getmtime(path))
+    except Exception:  # noqa: BLE001
+        pass
+    return render_template('salud.html', reporte=reporte, edad=edad)

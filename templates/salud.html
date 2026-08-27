@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Salud de la flota · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>🩺 Salud de la flota</h1>
+    <p><small class="muted">Último chequeo del monitor
+        {% if edad is not none %}hace <strong>{{ edad }} s</strong>{% else %}(sin datos){% endif %} ·
+        se actualiza cada ~10 min por cron. <code>✗</code> = problema (alerta por email) ·
+        <code>⚠</code> = warning (no alerta) · <code>✓</code> = ok.</small></p>
+</hgroup>
+
+{% if reporte %}
+<article class="card">
+    <pre style="white-space:pre-wrap;font-size:.85rem;line-height:1.45;margin:0;">{{ reporte }}</pre>
+</article>
+{% else %}
+<article class="card">
+    <p><span class="badge badge-warning">Aún no hay resultado</span> — el monitor todavía no escribió su
+       primer reporte. Espera a la próxima corrida del cron (cada 10 min) o córrelo a mano en el server:
+       <code>/usr/local/sbin/cybershop-health-alert.py</code>.</p>
+</article>
+{% endif %}
+
+<p style="margin-top:1rem;">
+    <a href="{{ url_for('dashboard.salud') }}" role="button" class="secondary outline">↻ Refrescar</a>
+    <a href="{{ url_for('dashboard.index') }}" role="button" class="secondary outline">← Dashboard</a>
+</p>
+{% endblock %}

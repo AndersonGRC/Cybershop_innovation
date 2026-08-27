@@ -42,6 +42,10 @@ def main():
         return
     report = (r.stdout or "") + (("\n[stderr]\n" + r.stderr) if r.stderr else "")
     print(report)
+    try:  # guardar el último reporte para la página /salud del panel (best-effort)
+        _save("/var/lib/cybershop/health_last.txt", report)
+    except Exception:
+        pass
 
     current = _bad_lines(report)
     if not current:
