@@ -394,3 +394,25 @@ def _as_bool(value, default=True):
     if value is None:
         return default
     return str(value).strip().lower() not in {'false', '0', 'no', 'off', ''}
+
+
+def get_restaurante_simple(tenant_id: int) -> bool:
+    """Lee el flag 'restaurante_modo_simple' del cliente_config del tenant.
+    Default False = modo completo (cocina/tiempos). Fail-open a False."""
+    try:
+        with tenant_cursor(tenant_id) as cur:
+            cur.execute("SELECT valor FROM cliente_config WHERE clave = 'restaurante_modo_simple' LIMIT 1")
+            r = cur.fetchone()
+            if r:
+                return _as_bool(r['valor'], False)
+    except Exception:
+        pass
+    return False
+
+
+def set_restaurante_simple(tenant_id: int, on: bool) -> bool:
+    """Activa/desactiva el modo simple del restaurante (agregar -> cobrar) para el
+    tenant, escribiendo 'restaurante_modo_simple' en su cliente_config (UPDATE→INSERT)."""
+    with tenant_cursor(tenant_id) as cur:
+        _upsert(cur, 'restaurante_modo_simple', 'true' if on else 'false', 'boolean', 'restaurante')
+    return bool(on)

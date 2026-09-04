@@ -258,6 +258,29 @@
         </article>
         <button type="submit">Guardar módulos</button>
     </form>
+
+    <article class="card">
+        <h3>🍽️ Restaurante — Modo simple</h3>
+        <p><small>Flujo mínimo: <strong>agregar productos → cobrar mesa</strong>. Oculta cocina, tiempos y
+           estados; deja eliminar un producto mal agregado. Aplica al panel web y al POS de escritorio
+           (tras sincronizar). Por defecto está en modo completo.</small></p>
+        <p>Estado actual:
+            {% if restaurante_simple %}<strong style="color:#1f9d57">SIMPLE (agregar → cobrar)</strong>
+            {% else %}<strong>COMPLETO (cocina / tiempos)</strong>{% endif %}
+        </p>
+        <div class="plan-row">
+            <form method="post" action="{{ url_for('tenants.restaurante_modo_simple', tenant_id=tenant.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="on" value="1">
+                <button type="submit" {% if restaurante_simple %}disabled{% endif %}>Activar modo simple</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.restaurante_modo_simple', tenant_id=tenant.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="on" value="0">
+                <button type="submit" class="secondary" {% if not restaurante_simple %}disabled{% endif %}>Volver a completo</button>
+            </form>
+        </div>
+    </article>
     {% else %}
     <p><em>El cliente no tiene BD accesible.</em></p>
     {% endif %}

@@ -229,6 +229,14 @@ def detail(tenant_id):
         except Exception:  # noqa: BLE001
             pass
 
+    # Modo simple del restaurante (agregar → cobrar) del cliente
+    restaurante_simple = False
+    if tenant.get('db_name'):
+        try:
+            restaurante_simple = ccs.get_restaurante_simple(tenant_id)
+        except Exception:  # noqa: BLE001
+            pass
+
     # Zona horaria de la instancia (para el desplegable del panel)
     import timezone_service as tzs
     tz_actual = tzs.current_tz(tenant['slug'])
@@ -246,6 +254,7 @@ def detail(tenant_id):
         site_groups=__import__('tenant_site_fields').SITE_GROUPS,
         section_fields=ccs.SECTION_FIELDS, plans=ms.PLANS,
         billing=billing,
+        restaurante_simple=restaurante_simple,
         auditoria=audit_service.listar(tenant_id, 30),
         timezones=tzs.TIMEZONES, tz_actual=tz_actual,
     )
@@ -382,6 +391,25 @@ def billing_aviso_modo(tenant_id):
     except Exception as exc:  # noqa: BLE001
         flash(f'Error al cambiar el aviso: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#cobros')
+
+
+@bp.route('/<int:tenant_id>/restaurante/modo-simple', methods=['POST'])
+@login_required
+def restaurante_modo_simple(tenant_id):
+    """Activa/desactiva el modo simple del restaurante (agregar → cobrar) del cliente."""
+    if not tenant_service.get_tenant(tenant_id):
+        abort(404)
+    on = request.form.get('on') in ('1', 'true', 'on', 'si')
+    try:
+        ccs.set_restaurante_simple(tenant_id, on)
+        audit_service.registrar(
+            'restaurante_modo_simple', tenant_id=tenant_id, actor=_por(),
+            detalle=('SIMPLE (agregar→cobrar)' if on else 'COMPLETO (cocina/tiempos)'))
+        flash('Restaurante: modo ' + ('SIMPLE — agregar → cobrar 🍽️' if on else 'COMPLETO — cocina/tiempos')
+              + ' para este cliente.', 'success')
+    except Exception as exc:  # noqa: BLE001
+        flash(f'Error al cambiar el modo del restaurante: {exc}', 'error')
+    return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#modulos')
 
 
 @bp.route('/<int:tenant_id>/billing/pago', methods=['POST'])
