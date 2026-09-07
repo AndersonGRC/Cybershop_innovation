@@ -1,0 +1,16 @@
+# /etc/sudoers.d/cybershop-reload
+# Permite que el fADMIN (corre como www-data) recargue las instancias sin
+# contraseña, tal como las invoca provisioning_service.service_unit(): la unidad
+# va SIN sufijo .service → "cybershop" (operador/primario) o "cybershop@<slug>".
+#
+# El bug histórico: solo estaba "reload cybershop.service" (con sufijo), pero el
+# código envía "cybershop" (sin sufijo) → sudo no matchea → pide contraseña →
+# "a terminal is required to read the password". Por eso se incluyen ambos.
+#
+# Instalar (como root):
+#   install -m 0440 -o root -g root deploy/sudoers-cybershop-reload /etc/sudoers.d/cybershop-reload
+#   visudo -cf /etc/sudoers.d/cybershop-reload    # validar
+#
+# El restart del operador y de las instancias vive en /etc/sudoers.d/cybershop-admin.
+
+www-data ALL=(root) NOPASSWD: /usr/bin/systemctl reload cybershop, /usr/bin/systemctl reload cybershop.service, /usr/bin/systemctl reload cybershop@*

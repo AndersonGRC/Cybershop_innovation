@@ -24,7 +24,9 @@ import proxy_service
 IS_LINUX = (os.name == 'posix')
 # Ruta absoluta: el servicio del maestro corre con PATH restringido al venv
 # (sin /usr/bin), por lo que 'sudo'/'systemctl' a secas no se resuelven.
-SUDO = ['/usr/bin/sudo'] if IS_LINUX else []   # www-data corre systemctl con sudo (NOPASSWD acotado)
+SUDO = ['/usr/bin/sudo', '-n'] if IS_LINUX else []   # www-data corre systemctl con sudo (NOPASSWD acotado);
+# '-n' (no-interactivo): si faltara la regla NOPASSWD, falla claro en vez de intentar
+# leer contraseña de un TTY inexistente ("a terminal is required").
 SYSTEMCTL = '/usr/bin/systemctl'
 
 
@@ -193,7 +195,7 @@ def _is_public_path(path):
 
 
 def _run_deploy(subcmd):
-    r = subprocess.run(SUDO + ['-n', DEPLOY_SCRIPT, subcmd],
+    r = subprocess.run(SUDO + [DEPLOY_SCRIPT, subcmd],
                        capture_output=True, text=True, timeout=120)
     out = ((r.stdout or '') + (r.stderr or '')).strip()
     return r.returncode, out
