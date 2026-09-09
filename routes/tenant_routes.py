@@ -644,7 +644,7 @@ def dian_validate(tenant_id):
         abort(404)
     import dian_service as ds
     try:
-        checks = ds.validate(tenant['slug'])
+        checks = ds.validate(tenant['slug'], nit=tenant.get('nit'))
         # Estado del módulo en la app del cliente (cliente_config)
         try:
             mods = ms.get_modules(tenant_id)

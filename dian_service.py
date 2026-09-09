@@ -107,8 +107,79 @@ def get_status(slug: str) -> dict:
     }
 
 
-def validate(slug: str) -> list:
-    """Valida la cadena con red: devuelve [(ok: bool, mensaje: str), ...]."""
+def obtener_tenant_detalle(nit: str) -> dict | None:
+    """Configuración completa del tenant en el servicio DIAN (sin secretos)."""
+    resumen = buscar_tenant_por_nit(nit)
+    if not resumen or not resumen.get('id'):
+        return None
+    status, body = _request(
+        'GET', f"{_api()}/admin/tenants/{resumen['id']}",
+        headers={'X-Master-Key': Config.DIAN_MASTER_KEY},
+    )
+    return body if status == 200 and isinstance(body, dict) else None
+
+
+def _checks_fiscales(t: dict) -> list:
+    """Chequeos de la configuración tributaria del tenant (sin red a la DIAN).
+
+    Antes `validate()` solo miraba conectividad y API key, así que un cliente
+    podía dar 'todo verde' y ser incapaz de emitir: sin certificado, sin
+    resolución vigente, sin PIN o con el consecutivo fuera del rango.
+    """
+    from datetime import date
+
+    checks = []
+    ambiente = (t.get('ambiente') or '').strip() or '—'
+
+    checks.append((bool(t.get('cert_path')), 'Certificado .p12 cargado'))
+    checks.append((bool(t.get('cert_password_ok')),
+                   'Contraseña del certificado guardada (sin ella no se firma)'))
+    checks.append((bool(t.get('clave_tecnica')),
+                   'Clave técnica registrada (necesaria para el CUFE)'))
+    checks.append((bool(t.get('software_id')), 'Software ID registrado'))
+    checks.append((bool(t.get('software_pin_ok')),
+                   'PIN del software registrado (necesario para el CUDE de notas)'))
+    checks.append((bool(t.get('resolucion_dian')),
+                   'Resolución de numeración DIAN registrada'))
+    checks.append((bool(t.get('prefijo')), 'Prefijo de numeración configurado'))
+
+    # Vigencia: solo se afirma vencida cuando la fecha se puede leer.
+    vigencia = str(t.get('resolucion_vigencia') or '').strip()
+    if vigencia:
+        try:
+            hasta = date.fromisoformat(vigencia[:10])
+            checks.append((hasta >= date.today(),
+                           f"Resolución vigente (hasta {hasta.isoformat()})"))
+        except ValueError:
+            checks.append((False, f"Vigencia de la resolución ilegible: {vigencia!r}"))
+    else:
+        checks.append((False, 'Resolución sin fecha de vigencia registrada'))
+
+    # Rango autorizado: el próximo consecutivo debe caer dentro.
+    try:
+        desde = int(t.get('resolucion_desde'))
+        hasta_n = int(t.get('resolucion_hasta'))
+        siguiente = int(t.get('consecutivo_actual') or 0) + 1
+        checks.append((desde <= siguiente <= hasta_n,
+                       f"Próximo consecutivo {siguiente} dentro del rango "
+                       f"autorizado {desde}–{hasta_n}"))
+    except (TypeError, ValueError):
+        checks.append((False, 'Rango de numeración autorizado no configurado'))
+
+    if ambiente == 'habilitacion':
+        checks.append((bool(t.get('test_set_id')),
+                       'TestSetId presente (la DIAN solo cuenta el set de pruebas '
+                       'si se envía con él)'))
+    checks.append((bool(t.get('activo')), f"Tenant activo en el servicio (ambiente: {ambiente})"))
+    return checks
+
+
+def validate(slug: str, nit: str = None) -> list:
+    """Valida la cadena con red: devuelve [(ok: bool, mensaje: str), ...].
+
+    Con `nit` añade los chequeos de configuración tributaria del tenant. Ninguno
+    envía nada a la DIAN: todo se lee del servicio de facturación.
+    """
     checks = []
     checks.append((is_configured(),
                    'DIAN_MASTER_KEY configurada en el maestro (.cybershop.conf)'))
@@ -127,6 +198,17 @@ def validate(slug: str) -> list:
                        'API key del cliente aceptada por el servicio DIAN'
                        if status == 404 else
                        f"API key del cliente rechazada por el servicio (HTTP {status})"))
+
+    # fADMIN no guarda el NIT del cliente; el que hay es el BILLING_ID de su
+    # env (la identificación con la que factura). Sirve para localizar su
+    # tenant en el servicio DIAN, que sí tiene la configuración tributaria.
+    nit = (nit or env.get('BILLING_ID') or '').strip()
+    if alive and nit and is_configured():
+        detalle = obtener_tenant_detalle(nit)
+        if detalle:
+            checks.extend(_checks_fiscales(detalle))
+        else:
+            checks.append((False, f"No existe tenant con NIT {nit} en el servicio DIAN"))
     return checks
 
 
