@@ -119,6 +119,28 @@ def obtener_tenant_detalle(nit: str) -> dict | None:
     return body if status == 200 and isinstance(body, dict) else None
 
 
+def _fecha_servicio(valor):
+    """Parsea una fecha venida del servicio DIAN, en ISO o en formato HTTP.
+
+    Flask serializa un `date` que nadie convirtió como RFC 1123
+    ('Sat, 19 Jan 2030 00:00:00 GMT'). Se aceptan ambos para que el panel
+    funcione contra cualquier versión del portal, incluida una sin actualizar.
+    """
+    from datetime import date
+    texto = str(valor or '').strip()
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto[:10])
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(texto).date()
+    except Exception:
+        return None
+
+
 def _checks_fiscales(t: dict) -> list:
     """Chequeos de la configuración tributaria del tenant (sin red a la DIAN).
 
@@ -145,15 +167,23 @@ def _checks_fiscales(t: dict) -> list:
 
     # Vigencia: solo se afirma vencida cuando la fecha se puede leer.
     vigencia = str(t.get('resolucion_vigencia') or '').strip()
-    if vigencia:
-        try:
-            hasta = date.fromisoformat(vigencia[:10])
-            checks.append((hasta >= date.today(),
-                           f"Resolución vigente (hasta {hasta.isoformat()})"))
-        except ValueError:
-            checks.append((False, f"Vigencia de la resolución ilegible: {vigencia!r}"))
-    else:
+    if not vigencia:
         checks.append((False, 'Resolución sin fecha de vigencia registrada'))
+    else:
+        hasta = _fecha_servicio(vigencia)
+        if hasta is None:
+            checks.append((False, f"Vigencia de la resolución ilegible: {vigencia!r}"))
+        else:
+            dias = (hasta - date.today()).days
+            if dias < 0:
+                checks.append((False, f"Resolución VENCIDA el {hasta.isoformat()}"))
+            else:
+                # Avisar con tiempo: renovar una resolución ante la DIAN no es
+                # inmediato y quedarse sin numeración detiene la facturación.
+                checks.append((dias > 30,
+                               f"Resolución vigente hasta {hasta.isoformat()} "
+                               f"({dias} día(s))" + ('' if dias > 30 else
+                               ' — vence pronto, hay que renovarla')))
 
     # Rango autorizado: el próximo consecutivo debe caer dentro.
     try:
@@ -209,6 +239,16 @@ def validate(slug: str, nit: str = None) -> list:
             checks.extend(_checks_fiscales(detalle))
         else:
             checks.append((False, f"No existe tenant con NIT {nit} en el servicio DIAN"))
+    else:
+        # Decirlo en vez de omitirlos: si no se corren, el panel no puede
+        # afirmar que el cliente esté en condiciones de facturar.
+        if not nit:
+            falta = ('no hay NIT del cliente (configurar BILLING_ID en su env)')
+        elif not is_configured():
+            falta = ('falta DIAN_MASTER_KEY en el .cybershop.conf del maestro')
+        else:
+            falta = 'el servicio DIAN no responde'
+        checks.append((False, f"Validación tributaria NO verificada: {falta}"))
     return checks
 
 
