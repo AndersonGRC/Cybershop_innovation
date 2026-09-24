@@ -5,7 +5,7 @@ from flask import (
     jsonify, send_file,
 )
 
-from auth import login_required
+from auth import current_admin, login_required
 import tenant_service
 import api_key_service
 import client_config_service as ccs
@@ -165,12 +165,14 @@ def detail(tenant_id):
 
     # Config/secciones/módulos del cliente (requiere su BD)
     cfg = secs = mods = None
+    acciones_ia = None
     site_error = None
     if tenant.get('db_name'):
         try:
             cfg = ccs.get_config(tenant_id)
             secs = ccs.get_sections(tenant_id)
             mods = ms.get_modules(tenant_id)
+            acciones_ia = ms.get_ai_actions_audit(tenant_id)
         except Exception as exc:  # noqa: BLE001
             site_error = str(exc)
 
@@ -246,6 +248,7 @@ def detail(tenant_id):
         'tenant_detail.html', tenant=tenant, keys=keys, health=health,
         plantilla_actual=plantilla_actual, plantillas_sitio=PLANTILLAS_SITIO,
         cfg=cfg, secs=secs, mods=mods, site_error=site_error,
+        acciones_ia=acciones_ia,
         integraciones=integraciones, dian=dian, runtime=runtime,
         proxy_preview=proxy_preview, server_ip=_Cfg.SERVER_IP,
         proxy_backend=_Cfg.PROXY_BACKEND,
@@ -286,8 +289,19 @@ def integraciones_save(tenant_id):
     if not tenant:
         abort(404)
     try:
+        before = ints.read_env(tenant['slug'])
         ints.save_integrations(tenant['slug'], request.form)
-        flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente.', 'success')
+        after = ints.read_env(tenant['slug'])
+        changed = [key for key in ints.MANAGED_KEYS if before.get(key) != after.get(key)]
+        if changed:
+            audit_service.registrar('integraciones_actualizadas', tenant_id=tenant_id,
+                                    actor=_por(), detalle='claves=' + ','.join(changed))
+        from config import Config as _Cfg
+        if tenant['slug'] == _Cfg.PRIMARY_TENANT_SLUG:
+            flash('Valores guardados, pero la instancia principal lee .cybershop.conf; '
+                  'estos cambios todavía no se aplican desde este panel.', 'warning')
+        else:
+            flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando integraciones: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')
@@ -350,7 +364,8 @@ def ai_models(tenant_id):
 # ── Cobros / mora ────────────────────────────────────────────────
 
 def _por():
-    return session.get('admin_email') or session.get('admin') or 'maestro'
+    admin = current_admin()
+    return admin['email'] if admin else 'maestro'
 
 
 @bp.route('/<int:tenant_id>/billing/config', methods=['POST'])
@@ -531,9 +546,14 @@ def modulos_save(tenant_id):
         plan = (request.form.get('plan') or '').strip()
         if plan:
             ms.apply_plan(tenant_id, plan)
+            audit_service.registrar('modulos_plan', tenant_id=tenant_id,
+                                    actor=_por(), detalle=f'plan={ms.normalize_plan(plan)}')
             flash(f"Plan '{plan}' aplicado a los módulos del cliente.", 'success')
         else:
-            ms.save_modules(tenant_id, request.form.getlist('modulo'))
+            active = request.form.getlist('modulo')
+            ms.save_modules(tenant_id, active)
+            audit_service.registrar('modulos_actualizados', tenant_id=tenant_id,
+                                    actor=_por(), detalle='activos=' + ','.join(sorted(active)))
             flash('Módulos del cliente actualizados.', 'success')
         # Degradación controlada: si Ventas/POS quedó habilitado pero PayU no
         # está configurado, avisar (el sitio oculta el pago en línea solo).
@@ -564,7 +584,8 @@ def modulos_save(tenant_id):
             if t and prov.IS_LINUX:
                 prov.restart_service(t['slug'])
         except Exception:
-            pass
+            flash('Módulos guardados, pero no se pudo reiniciar la instancia. '
+                  'Reiníciala desde la pestaña Técnico para aplicar el cambio.', 'warning')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando módulos: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#modulos')
@@ -579,10 +600,10 @@ def toggle(tenant_id):
     import lifecycle_service as lc
     try:
         if tenant['estado'] == 'activo':
-            lc.suspend(tenant_id, actor='fADMIN')
+            lc.suspend(tenant_id, actor=_por())
             flash('Cliente suspendido: instancia apagada (no permite ingreso) y API keys desactivadas.', 'success')
         else:
-            lc.reactivate(tenant_id, actor='fADMIN')
+            lc.reactivate(tenant_id, actor=_por())
             flash('Cliente reactivado. Revisá que la instancia esté arriba y reactivá las API keys necesarias.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error cambiando estado: {exc}', 'error')
@@ -671,6 +692,7 @@ def instancia_accion(tenant_id):
     if not tenant:
         abort(404)
     accion = (request.form.get('accion') or '').strip()
+    codigo_disponible_global = False
     try:
         import provisioning_service as prov
         if accion == 'restart':
@@ -694,18 +716,20 @@ def instancia_accion(tenant_id):
             applied = tm.migrate_db(tenant['db_name'])
             flash(f"Migración de BD: {len(applied)} aplicada(s)." if applied else "BD al día (nada que migrar).", 'success')
         elif accion == 'update':
-            # "Actualizar app": replica al cliente lo FUNCIONAL (después del login)
-            # + seguridad/backend, SIN tocar su sitio público ni sus datos.
+            # "Actualizar app": integra código COMPARTIDO (potencialmente visible
+            # para todas las instancias), luego migra la BD del cliente elegido
+            # y recarga solo su proceso. No reescribe marca/overrides del cliente.
             #   1) TRAER el código desde GitHub con GATE de cambios públicos
             #      (deploy_code); si hay cambios públicos y no include_public → BLOQUEA;
-            #   2) migrar estructura de su BD (aditivo — no toca cliente_config /
-            #      public_site_settings / config_secciones, que son SUS datos);
+            #   2) migrar estructura de su BD (aditivo; también sincroniza el
+            #      aviso de cobro, sin reescribir marca/config pública);
             #   3) recargar workers con SIGHUP para que carguen el código nuevo
             #      sin cortar peticiones. Env/venv/unit requieren restart aparte.
             # "Deploy completo" (include_public=1) trae también el sitio público.
             import tenant_migrations as tm
             include_public = bool(request.form.get('include_public'))
             status, msg_deploy = prov.deploy_code(include_public=include_public)
+            codigo_disponible_global = status in ('updated', 'uptodate')
             if status == 'blocked':
                 flash("No se actualizó (nada se aplicó): " + msg_deploy, 'warning')
             elif status == 'error':
@@ -719,12 +743,19 @@ def instancia_accion(tenant_id):
                 prov.reload_service(tenant['slug'])
                 partes.append("instancia recargada sin corte" if prov.IS_LINUX else "reload omitido (dev)")
                 flash("Cliente actualizado: " + "; ".join(partes)
-                      + ". Su sitio público (colores, logo, secciones, datos) quedó intacto.",
+                      + ". El código es compartido: verifica también las demás instancias "
+                        "antes de continuar. No se reescribieron marca ni overrides del cliente.",
                       'success')
         else:
             flash('Acción no reconocida.', 'warning')
     except Exception as exc:  # noqa: BLE001
-        flash(f'Error en la acción de instancia: {exc}', 'error')
+        if accion == 'update' and codigo_disponible_global:
+            flash('Actualización parcial: el código compartido ya está en disco, '
+                  'pero la migración o recarga de este cliente no terminó. '
+                  f'No actualices otros clientes hasta revisar Git, BD y servicio: {exc}',
+                  'error')
+        else:
+            flash(f'Error en la acción de instancia: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
 
 
@@ -778,10 +809,10 @@ def destroy(tenant_id):
         return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#tecnico')
     try:
         if mode == 'hard':
-            backup = lc.destroy_hard(tenant_id)
+            backup = lc.destroy_hard(tenant_id, actor=_por())
             flash(f'Cliente ELIMINADO (hard). Backup en {backup}. La BD fue borrada.', 'warning')
         else:
-            backup = lc.destroy_soft(tenant_id)
+            backup = lc.destroy_soft(tenant_id, actor=_por())
             flash(f'Cliente cancelado (soft). Backup en {backup}. La BD se conservó.', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error destruyendo cliente: {exc}', 'error')

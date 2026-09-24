@@ -269,6 +269,7 @@
     <form method="post" action="{{ url_for('tenants.modulos_save', tenant_id=tenant.id) }}">
         <article class="card">
             <h3>Módulos activos del cliente</h3>
+            <p><small>«Acciones operativas con IA» viene apagado incluso en el plan Ultra. Actívalo por cliente únicamente después de aplicar la migración de su base de datos y revisar los permisos de inventario y CRM.</small></p>
             {% for cat, items in mods|groupby('categoria') %}
             <h4 class="cat-title">{{ cat|capitalize }}</h4>
             <div class="toggle-grid">
@@ -283,6 +284,32 @@
         </article>
         <button type="submit">Guardar módulos</button>
     </form>
+    <article class="card">
+        <h3>Últimas acciones operativas con IA</h3>
+        <p><small>Solo decisiones de este cliente. El detalle y los borradores permanecen en su propia base de datos.</small></p>
+        {% if acciones_ia is none %}
+        <p><small>Historial no disponible: aplica la migración 0015 en la base de este cliente.</small></p>
+        {% elif not acciones_ia %}
+        <p><small>Aún no hay acciones confirmadas o canceladas.</small></p>
+        {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Estado</th><th>Resumen</th></tr></thead>
+                <tbody>
+                {% for a in acciones_ia %}
+                <tr>
+                    <td>{{ a.decidido_en or a.creado_en }}</td>
+                    <td>#{{ a.usuario_id }}</td>
+                    <td>{{ a.tipo|replace('_', ' ') }}</td>
+                    <td>{{ a.estado }}</td>
+                    <td>{{ a.resumen }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </article>
     {% else %}
     <p><em>Los módulos por plan (SaaS) no están habilitados en este servidor.</em></p>
     {% endif %}
@@ -348,6 +375,16 @@
         {% for grp in integraciones %}
         <details class="card int-group" {% if loop.first %}open{% endif %}>
             <summary>{{ grp.group }}</summary>
+            {% if grp.group == 'Respaldo de emergencia Anthropic' %}
+            <p><small>Se configura por cliente. El respaldo queda apagado con presupuesto 0 USD
+            o sin API Key. El contador local es estimado y no es un límite bancario: establece
+            también un límite de gasto en Anthropic antes de activarlo.
+            {% if tenant.slug != primary_slug %}Los cambios se aplican al reiniciar la instancia.{% endif %}</small></p>
+            {% if tenant.slug == primary_slug %}
+            <p><small class="muted">Esta es la instancia principal: actualmente lee su configuración
+            de .cybershop.conf. Los valores guardados aquí aún no se aplican al reiniciarla.</small></p>
+            {% endif %}
+            {% endif %}
             <div class="grid-2">
                 {% for f in grp.fields %}
                 <label>{{ f.label }}{% if f.secret %} <span class="muted">🔒</span>{% endif %}
@@ -367,12 +404,24 @@
                     </span>
                     {% endif %}
                     {% elif f.secret %}
-                    <input type="text" name="{{ f.key }}" value="" autocomplete="off"
+                    <input type="password" name="{{ f.key }}" value="" autocomplete="new-password"
                            placeholder="{{ f.masked if f.has_value else '(no configurado)' }}">
+                    {% elif f.type == 'number' %}
+                    <input type="number" name="{{ f.key }}" value="{{ f.value }}"
+                           step="{{ '0.01' if f.key == 'AI_NUBE_PRESUPUESTO_USD' else '1' }}"
+                           {% if f.key == 'AI_NUBE_PRESUPUESTO_USD' %}min="0" max="5"{% endif %}
+                           {% if f.key == 'AI_NUBE_ESPERA_LOCAL_S' %}min="180" max="86400"{% endif %}
+                           {% if f.key == 'AI_NUBE_FALLOS_LOCAL_MIN' %}min="3" max="10"{% endif %}
+                           {% if f.key == 'AI_NUBE_MAX_TOKENS' %}min="1" max="220"{% endif %}
+                           {% if f.key == 'AI_NUBE_TIMEOUT' %}min="5" max="60"{% endif %}>
                     {% else %}
                     <input type="text" name="{{ f.key }}" value="{{ f.value }}">
                     {% endif %}
                 </label>
+                {% if f.key == 'AI_NUBE_API_KEY' and f.has_value %}
+                <label><input type="checkbox" name="AI_NUBE_API_KEY_CLEAR" value="1">
+                    Borrar la API Key y desactivar el respaldo de este cliente</label>
+                {% endif %}
                 {% endfor %}
             </div>
         </details>
@@ -718,7 +767,7 @@
 
         <div class="plan-row" style="margin-top:.8rem; gap:.5rem; flex-wrap:wrap; align-items:center;">
             <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}" style="margin:0;"
-                  onsubmit="return confirm('Trae las mejoras FUNCIONALES (después del login) + seguridad/backend, migra la BD (aditivo) y recarga workers sin corte. Se BLOQUEA si hay cambios del sitio público pendientes. NO usar si cambiaron dependencias o variables de entorno. ¿Continuar?')">
+                  onsubmit="return confirm('Integra código COMPARTIDO para todas las instancias, migra SOLO la BD de este cliente y recarga SOLO su proceso. Requiere haber actualizado el maestro y publicado ambos repositorios. No aplica env, dependencias ni escritorio. ¿Continuar?')">
                 <input type="hidden" name="accion" value="update">
                 <button class="btn-small" type="submit">⬆ Actualizar app (después del login)</button>
             </form>
@@ -749,13 +798,15 @@
             {% endif %}
         </div>
         <p style="margin:.5rem 0 0;"><small class="muted">
-            <strong>Actualizar app (después del login)</strong>: replica las mejoras funcionales y de
-            seguridad — trae el código compartido (se <strong>bloquea si hay cambios del sitio público
-            pendientes</strong>), migra la BD (aditivo, no borra datos) y recarga la instancia sin corte.
-            <strong>Nunca modifica el sitio público ni los datos del cliente</strong> (colores, logo,
-            secciones y datos de empresa son propios de cada cliente).
-            Si cambiaron dependencias, variables de entorno o el unit systemd, se requiere el
-            procedimiento controlado de reinicio en vez de este botón.
+            <strong>Actualizar app (después del login)</strong>: integra el código web
+            <strong>compartido por todos los clientes</strong> (se bloquea si detecta rutas públicas
+            pendientes de su lista), migra <strong>solo esta BD</strong> y recarga
+            <strong>solo esta instancia</strong>. Las migraciones y el aviso de cobro sí escriben
+            estructura/metadatos; no se reescriben marca ni overrides propios. Cambios del backend
+            compartido pueden afectar también al sitio público. Si falla la migración o recarga, el
+            código global puede haber cambiado: verifica el estado antes de reintentar.
+            El botón no actualiza este panel maestro, el escritorio, dependencias, variables de
+            entorno ni el unit systemd; esas tareas requieren sus procedimientos y reinicio.
             <strong>Deploy completo</strong>: úsalo solo cuando quieras publicar también cambios del
             sitio público (antes del login).
         </small></p>

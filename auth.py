@@ -62,10 +62,11 @@ def authenticate_pin(pin: str):
 
 
 def login_required(fn):
-    """Bloquea acceso a rutas no logueadas. Redirige a /login con `next` set."""
+    """Bloquea sesiones ausentes o de administradores desactivados."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if not session.get(SESSION_KEY):
+        if not session.get(SESSION_KEY) or current_admin() is None:
+            session.clear()
             flash('Inicia sesión para continuar.', 'warning')
             return redirect(url_for('auth.login', next=request.path))
         return fn(*args, **kwargs)

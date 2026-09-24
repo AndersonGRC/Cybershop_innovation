@@ -48,20 +48,17 @@ def create_tenant_internal():
     try:
         result = tenant_service.create_tenant(
             slug=slug, nombre=nombre,
-            key_label='Venta automática', admin_email=email)
+            key_label='Venta automática', admin_email=email, plan=plan)
     except tenant_service.TenantCreationError as exc:
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
         return jsonify({'error': f'Error interno creando el cliente: {exc}'}), 500
 
-    try:
-        import module_service as ms
-        if plan in ms.PLAN_MODULES:
-            ms.apply_plan(result['tenant_id'], plan)
-            result['modulos_plan'] = plan
-    except Exception as exc:  # noqa: BLE001
-        # No abortar: el tenant existe; los módulos se ajustan desde el panel.
-        result['modulos_plan'] = f'fallo apply_plan: {exc}'
+    # create_tenant ya persiste el plan y aplica sus módulos. Evita crear la fila
+    # como "estandar" y luego activar un conjunto distinto de módulos.
+    result['modulos_plan'] = ('pendiente' if any(
+        'módulos del plan no aplicados' in warning
+        for warning in result.get('warnings', [])) else result['plan'])
 
     return jsonify(result), 201
 

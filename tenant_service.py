@@ -305,8 +305,8 @@ def _apply_seed(db_name: str, nombre: str, admin_email: str, slug: str = 'princi
     Para garantizar que un cliente nuevo nazca SIEMPRE al día, ejecuta las
     migraciones de tenant (aditivas e idempotentes): si el dump del schema ya
     las incluye son no-ops; si el dump quedó desactualizado, cierran la brecha.
-    Si alguna migración fallara, no se aborta la creación (la estructura del
-    dump ya es funcional) y se podrá reintentar con "Actualizar a última versión".
+    Si una migración falla, se aborta la creación: registrar una estructura
+    incompleta como actualizada pondría a ese cliente en un estado engañoso.
 
     Devuelve {'admin_email', 'admin_password'} (mostrar 1 vez).
     """
@@ -320,12 +320,11 @@ def _apply_seed(db_name: str, nombre: str, admin_email: str, slug: str = 'princi
         conn.close()
     try:
         tenant_migrations.migrate_db(db_name)
-    except Exception:  # noqa: BLE001 — una migración rota no impide crear al cliente
-        conn2 = get_tenant_conn(db_name)
-        try:
-            tenant_migrations.mark_all_applied(conn2)
-        finally:
-            conn2.close()
+    except Exception as exc:
+        raise TenantCreationError(
+            f'No se pudieron aplicar las migraciones de {db_name}; '
+            'la creación debe revertirse, sin marcarlas como aplicadas.'
+        ) from exc
     return seed
 
 
