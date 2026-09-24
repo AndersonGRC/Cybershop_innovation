@@ -261,6 +261,25 @@ PORT_MIN=8100
 PORT_MAX=8999
 ```
 
+### Respaldo de todas las bases registradas
+
+El cron de las 03:30 ejecuta `/usr/local/bin/cybershop-backup.sh`. Su fuente
+versionable está en `deploy/cybershop-backup.sh`: consulta
+`saas_control_plane.tenant_databases` y respalda **cada** base registrada,
+incluidas las suspendidas y las de nombre heredado que no siguen el patrón
+`cyber_tNNN`. También respalda el propio plano de control. El script anterior
+basado solo en el patrón `^cyber_t[0-9]+$` omitía bases con nombre propio.
+
+Antes de instalarlo, usar `bash -n deploy/cybershop-backup.sh` y comparar
+`bash deploy/cybershop-backup.sh --list` con el inventario del maestro. Conservar
+una copia del script instalado, instalar el nuevo con permisos de root y probar
+`/usr/local/bin/cybershop-backup.sh --no-prune`: crea respaldos nuevos sin
+borrar los antiguos. Confirmar que hay un `.sql.gz` no vacío por cada base,
+que `gzip -t` pasa y que una restauración en un entorno aislado funciona. El
+cron normal conserva la rotación de siete días; `--no-prune` es solo para la
+prueba controlada. No copiar respaldos de clientes al repositorio ni restaurar
+uno sobre la base de otro cliente.
+
 ## B. Infra de serving (una sola vez en el servidor)
 
 1. **Código compartido + venv del app** ya en `/var/www/CyberShop` (con `app/env/`).
@@ -292,17 +311,24 @@ PORT_MAX=8999
 
 Con esto, **crear un cliente desde el panel** ya levanta su BD + instancia + dominio.
 
-## C. Flujo de ACTUALIZACIÓN (sin afectar lo existente)
+## C. Flujo de ACTUALIZACIÓN (controlado por cliente)
 
-### Actualizar el código del app (todos los clientes a la vez)
-```bash
-cd /var/www/CyberShop && sudo -u www-data git pull
-# Si el cambio agrega tablas/columnas, escribir la migración aditiva en
-# CyberShopAdmin/migrations/tenant/000X_*.sql (CREATE/ALTER ... IF NOT EXISTS) y:
-sudo -u www-data /var/www/CyberShopAdmin/venv/bin/python /var/www/CyberShopAdmin/tools/migrate_tenants.py
-# Reiniciar TODAS las instancias (aplica el código nuevo):
-sudo /var/www/CyberShopAdmin/venv/bin/python /var/www/CyberShopAdmin/tools/manage_instances.py restart
-```
+### Ruta actual para este lote: maestro primero, después botón por cliente
+
+Ver `CyberShop/app/docs/IA_ACTUALIZACION_CLIENTES.md` en el repositorio web
+(los dos repositorios están separados en GitHub).
+El botón **no actualiza este repo**: primero hay que publicar `CyberShopAdmin`
+con las migraciones tenant nuevas (`0015` incluida) y reiniciar el maestro.
+El código de `CyberShop` es compartido: el primer clic lo integra para todos;
+cada clic migra solo la BD del cliente elegido y **recarga** solo su instancia.
+No usar el antiguo `git pull` + reinicio masivo como si fuera un despliegue
+aislado o equivalente al botón. Tampoco instalará dependencias, env ni units.
+
+La implementación integra código **antes** de migrar la BD seleccionada. Si
+falla la migración/recarga, el código global puede quedar actualizado; detener
+el rollout y diagnosticar el estado antes de reintentar. Para cambios de
+esquema, el código debe tolerar bases aún sin migrar o se requiere un
+procedimiento manual de migración previa coordinada.
 
 ### Actualizar el maestro
 ```bash
@@ -342,10 +368,24 @@ Flujo completo (obligatorio para nuevos desarrollos): ver el repo de la app en
 
 **Resumen operativo** — pestaña **Técnico** de cada tenant:
 - **Actualizar app (después del login)**: `git pull` con **GATE de cambios públicos** + migrar BD
-  (aditivo) + reiniciar la instancia. Se **bloquea** si el push tocó el sitio público.
+  (aditivo) + **recargar** la instancia. Se **bloquea** si el push tocó una ruta pública
+  enumerada en `PUBLIC_PATHS`.
 - **Deploy completo (incluye público)**: igual, pero también publica el sitio público.
+
+Ni el botón normal ni «Deploy completo» actualizan `CyberShopAdmin`, el POS de
+escritorio ni la configuración de entorno de las instancias. El código/estáticos
+compartidos pueden afectar al sitio público aun si no se cambió una ruta de
+`PUBLIC_PATHS`; los datos y overrides propios siguen fuera del repo.
 
 **Infra:** script root `/usr/local/bin/cybershop-deploy-code.sh` (subcomandos `changes`/`apply`)
 + `/etc/sudoers.d/cybershop-deploy` (www-data, NOPASSWD, solo esos 2 subcomandos). El *gate* vive en
 `provisioning_service.py::PUBLIC_PATHS`. `git merge --ff-only` nunca pisa cambios locales → los
-hot-fixes hechos por SSH **deben commitearse/pushearse** o el deploy falla avisando.
+hot-fixes hechos por SSH **deben commitearse/pushearse** o el deploy falla avisando. La fuente
+de ese script y su sudoers no está versionada en estos repos; comprobarlos en el VPS antes
+de considerar operativo el botón.
+
+El ejemplo `deploy/nginx.admin.conf` amplía el tiempo de espera del proxy a
+360 segundos porque dos pasos Git más una migración pueden superar los 60
+anteriores. Instalar/probar esta configuración en el VPS y recargar NGINX por
+el procedimiento de infraestructura; cambiar el archivo del repo no altera
+el proxy activo. Un 504 no demuestra rollback: revisar Git, la BD y systemd.
