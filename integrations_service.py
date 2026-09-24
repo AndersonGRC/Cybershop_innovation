@@ -8,6 +8,9 @@ reinicia la instancia. NO toca `CyberShop/app/`.
 """
 
 import json
+import os
+import re
+import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -135,14 +138,44 @@ GROUPS = [
         ('AI_MODEL', 'Modelo (ej. qwen2.5:14b-instruct)', False, 'text', None),
         ('AI_API_KEY', 'API Key (vacío para Ollama)', True, 'text', None),
     ]),
+    ('Respaldo de emergencia Anthropic', [
+        ('AI_NUBE_API_KEY', 'API Key de Anthropic', True, 'text', None),
+        ('AI_NUBE_MODEL', 'Modelo de respaldo', False, 'select', ['claude-haiku-4-5-20251001']),
+        ('AI_NUBE_ESPERA_LOCAL_S', 'Segundos de caída local antes del respaldo', False, 'number', None),
+        ('AI_NUBE_FALLOS_LOCAL_MIN', 'Sondeos fallidos mínimos del PC', False, 'number', None),
+        ('AI_NUBE_PRESUPUESTO_USD', 'Umbral local mensual estimado (USD; 0 = apagado)', False, 'number', None),
+        ('AI_NUBE_MAX_TOKENS', 'Máximo de tokens de respuesta', False, 'number', None),
+        ('AI_NUBE_TIMEOUT', 'Tiempo máximo de llamada (segundos)', False, 'number', None),
+        ('AI_NUBE_PARA_PUBLICO', 'Permitir respaldo en chat público', False, 'select', ['false', 'true']),
+    ]),
 ]
 
 _FIELD_BY_KEY = {f[0]: f for grp, fields in GROUPS for f in fields}
 SECRET_KEYS = {f[0] for grp, fields in GROUPS for f in fields if f[2]}
 MANAGED_KEYS = list(_FIELD_BY_KEY.keys())
+_EMERGENCY_DEFAULTS = {
+    'AI_NUBE_MODEL': 'claude-haiku-4-5-20251001',
+    'AI_NUBE_ESPERA_LOCAL_S': '180',
+    'AI_NUBE_FALLOS_LOCAL_MIN': '3',
+    'AI_NUBE_PRESUPUESTO_USD': '0',
+    'AI_NUBE_MAX_TOKENS': '220',
+    'AI_NUBE_TIMEOUT': '25',
+    'AI_NUBE_PARA_PUBLICO': 'false',
+}
+_NUMBER_BOUNDS = {
+    'AI_NUBE_ESPERA_LOCAL_S': (180, 86400),
+    'AI_NUBE_FALLOS_LOCAL_MIN': (3, 10),
+    'AI_NUBE_PRESUPUESTO_USD': (0, 5),
+    'AI_NUBE_MAX_TOKENS': (1, 220),
+    'AI_NUBE_TIMEOUT': (5, 60),
+}
 
 
 def env_path(slug: str) -> Path:
+    # El slug normalmente viene de tenants, pero esta barrera impide que una
+    # fila dañada termine leyendo o escribiendo el EnvironmentFile de otro.
+    if not isinstance(slug, str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,39}', slug):
+        raise ValueError('Slug de instancia inválido')
     return Path(Config.INSTANCE_ENV_DIR) / f"{slug}.env"
 
 
@@ -150,6 +183,8 @@ def read_env(slug: str) -> dict:
     """Lee TODO el env de la instancia (preserva claves no-gestionadas)."""
     p = env_path(slug)
     data = {}
+    if p.is_symlink():
+        raise ValueError('EnvironmentFile de instancia no puede ser un enlace simbólico')
     if not p.is_file():
         return data
     for line in p.read_text(encoding='utf-8').splitlines():
@@ -177,6 +212,8 @@ def get_integrations(slug: str) -> list:
         items = []
         for key, label, secret, ftype, options in fields:
             raw = env.get(key, '')
+            if key in _EMERGENCY_DEFAULTS and not raw:
+                raw = _EMERGENCY_DEFAULTS[key]
             # URL del servidor IA → precargar el default (mismo PC para todos) si
             # aún no se ha configurado, para que solo haya que elegir el modelo.
             if key == 'AI_BASE_URL' and not raw:
@@ -194,7 +231,8 @@ def get_integrations(slug: str) -> list:
                 'key': key, 'label': label, 'secret': secret, 'type': ftype,
                 'options': options,
                 'value': '' if secret else raw,         # secretos no se reenvían
-                'masked': _mask(raw) if secret else '',
+                'masked': ('••••' if raw else '') if key == 'AI_NUBE_API_KEY'
+                          else (_mask(raw) if secret else ''),
                 'has_value': bool(raw),
             })
         out.append({'group': group, 'fields': items})
@@ -208,16 +246,36 @@ def save_integrations(slug: str, form) -> None:
     - Secretos: si el form trae valor → se actualiza; si viene vacío → se conserva.
     """
     env = read_env(slug)
+    updates = {}
     for key in MANAGED_KEYS:
         if key not in form:
             continue
         submitted = (form.get(key) or '').strip()
+        if '\n' in submitted or '\r' in submitted or '\x00' in submitted:
+            raise ValueError(f'{key}: no se permiten saltos de línea ni caracteres nulos')
+        if key in _NUMBER_BOUNDS:
+            lo, hi = _NUMBER_BOUNDS[key]
+            try:
+                number = float(submitted)
+            except ValueError as exc:
+                raise ValueError(f'{key}: introduce un número entre {lo} y {hi}') from exc
+            if not lo <= number <= hi or number != number:
+                raise ValueError(f'{key}: debe estar entre {lo} y {hi}')
+            if key != 'AI_NUBE_PRESUPUESTO_USD' and not number.is_integer():
+                raise ValueError(f'{key}: introduce un número entero')
+        if key == 'AI_NUBE_PARA_PUBLICO' and submitted not in {'true', 'false'}:
+            raise ValueError('AI_NUBE_PARA_PUBLICO: valor inválido')
+        if key == 'AI_NUBE_MODEL' and submitted != 'claude-haiku-4-5-20251001':
+            raise ValueError('AI_NUBE_MODEL: modelo sin precio validado para este respaldo')
         is_secret = _FIELD_BY_KEY[key][2]
         if is_secret:
             if submitted:                 # solo actualiza si escribió algo nuevo
-                env[key] = submitted
+                updates[key] = submitted
         else:
-            env[key] = submitted
+            updates[key] = submitted
+    if form.get('AI_NUBE_API_KEY_CLEAR') == '1':
+        updates['AI_NUBE_API_KEY'] = ''
+    env.update(updates)
     _write_env(slug, env)
 
 
@@ -232,5 +290,25 @@ def set_env_values(slug: str, values: dict) -> None:
 def _write_env(slug: str, data: dict) -> None:
     p = env_path(slug)
     p.parent.mkdir(parents=True, exist_ok=True)
-    lines = [f"{k}={v}" for k, v in data.items()]
-    p.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    if p.is_symlink():
+        raise ValueError('EnvironmentFile de instancia no puede ser un enlace simbólico')
+    lines = []
+    for key, value in data.items():
+        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', str(key)):
+            raise ValueError(f'Nombre de variable inválido: {key!r}')
+        value = str(value)
+        if any(ch in value for ch in '\r\n\x00'):
+            raise ValueError(f'{key}: no se permiten saltos de línea ni caracteres nulos')
+        lines.append(f'{key}={value}')
+    # os.replace evita archivos parciales si el proceso cae mientras escribe.
+    # tempfile crea el archivo en modo 0600 (secretos de todos los proveedores).
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=p.parent,
+                                         prefix=f'.{p.name}.', delete=False) as tmp:
+            temp_name = tmp.name
+            tmp.write('\n'.join(lines) + '\n')
+        os.replace(temp_name, p)
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
