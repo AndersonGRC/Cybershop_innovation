@@ -31,6 +31,7 @@ MODULES = [
     ('restaurant_tables', 'Mesas Restaurante', 'Plano de mesas, cuenta abierta y consumos.', 'operacion', 'restaurant_tables_habilitado', True),
     ('facturacion_electronica', 'Facturación DIAN', 'Facturación electrónica integrada con DIAN.', 'finanzas', 'facturacion_electronica', False),
     ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
+    ('ai_actions', 'Acciones operativas con IA', 'Permite preparar ajustes de inventario y cambios de contactos desde el panel IA. Cada cambio exige confirmación humana y se registra en la BD del cliente. Apagado por defecto.', 'inteligencia', 'ia_acciones_habilitadas', False),
     ('ai_public', 'Chat del sitio', 'Chatbot IA en el sitio publico del cliente: productos, servicios, horarios y preguntas frecuentes, con SU informacion. Sin acceso a contabilidad ni datos de clientes.', 'inteligencia', 'chat_publico_habilitado', False),
     ('bulk_upload', 'Cargue masivo', 'Importación masiva de productos y géneros por Excel. Al desactivarlo, esos botones desaparecen del panel del cliente.', 'catalogo', 'cargue_masivo_habilitado', True),
 ]
@@ -45,7 +46,7 @@ PLAN_MODULES = {
     'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'bulk_upload'},
     'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
                  'billing', 'coupons', 'wishlist', 'crm', 'support', 'bulk_upload'},
-    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public'},
+    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public', 'ai_actions'},
 }
 PLANS = list(PLAN_MODULES.keys())
 
@@ -142,3 +143,20 @@ def save_modules(tenant_id: int, active_codes) -> None:
     with tenant_cursor(tenant_id) as cur:
         for code, nombre, desc, cat, ck, default in MODULES:
             _upsert_flag(cur, ck, code in active, desc)
+
+
+def get_ai_actions_audit(tenant_id: int):
+    """Últimas decisiones del agente, leídas SOLO de la BD de este cliente.
+
+    None significa que aún no se aplicó la migración. No se lee el payload del
+    borrador ni se copia ningún dato operativo al control plane.
+    """
+    with tenant_cursor(tenant_id) as cur:
+        cur.execute("SELECT to_regclass('public.ia_acciones_pendientes') AS tabla")
+        if not cur.fetchone()['tabla']:
+            return None
+        cur.execute("""SELECT id, tipo, estado, usuario_id, resumen, creado_en, decidido_en
+                       FROM ia_acciones_pendientes
+                       WHERE estado <> 'pendiente'
+                       ORDER BY decidido_en DESC NULLS LAST, creado_en DESC LIMIT 20""")
+        return [dict(row) for row in cur.fetchall()]
