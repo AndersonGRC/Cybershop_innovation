@@ -31,6 +31,7 @@ MODULES = [
     ('restaurant_tables', 'Mesas Restaurante', 'Plano de mesas, cuenta abierta y consumos.', 'operacion', 'restaurant_tables_habilitado', True),
     ('facturacion_electronica', 'Facturación DIAN', 'Facturación electrónica integrada con DIAN.', 'finanzas', 'facturacion_electronica', False),
     ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
+    ('ai_public', 'Chat del sitio', 'Chatbot IA en el sitio publico del cliente: productos, servicios, horarios y preguntas frecuentes, con SU informacion. Sin acceso a contabilidad ni datos de clientes.', 'inteligencia', 'chat_publico_habilitado', False),
     ('bulk_upload', 'Cargue masivo', 'Importación masiva de productos y géneros por Excel. Al desactivarlo, esos botones desaparecen del panel del cliente.', 'catalogo', 'cargue_masivo_habilitado', True),
 ]
 
@@ -44,7 +45,7 @@ PLAN_MODULES = {
     'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'bulk_upload'},
     'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
                  'billing', 'coupons', 'wishlist', 'crm', 'support', 'bulk_upload'},
-    'ultra':    set(ALL_CODES) - {'facturacion_electronica'},
+    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public'},
 }
 PLANS = list(PLAN_MODULES.keys())
 
