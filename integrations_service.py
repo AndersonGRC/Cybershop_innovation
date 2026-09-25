@@ -181,7 +181,10 @@ def env_path(slug: str) -> Path:
 
 def read_env(slug: str) -> dict:
     """Lee TODO el env de la instancia (preserva claves no-gestionadas)."""
-    p = env_path(slug)
+    return read_env_file(env_path(slug))
+
+
+def read_env_file(p: Path) -> dict:
     data = {}
     if p.is_symlink():
         raise ValueError('EnvironmentFile de instancia no puede ser un enlace simbólico')
@@ -218,12 +221,13 @@ def get_integrations(slug: str) -> list:
             # aún no se ha configurado, para que solo haya que elegir el modelo.
             if key == 'AI_BASE_URL' and not raw:
                 raw = Config.AI_DEFAULT_BASE_URL
-            # Modelo IA → combobox (datalist): dropdown con la ÚLTIMA lista conocida
-            # (caché, sin red → no bloquea la carga) y además permite escribir uno
-            # nuevo. El botón "Actualizar modelos" refresca en vivo por AJAX.
+            # Modelo IA → lista desplegable de verdad (antes un datalist que parecía
+            # texto libre, y escribir el nombre exacto era fácil de errar). Sale de
+            # la ÚLTIMA lista conocida (caché, sin red → no bloquea la carga); el
+            # botón "Actualizar modelos" la refresca en vivo por AJAX.
             if key == 'AI_MODEL':
                 base = env.get('AI_BASE_URL', '') or Config.AI_DEFAULT_BASE_URL
-                ftype = 'datalist'
+                ftype = 'modelos'
                 options = models_cached(base)
                 if raw and raw not in options:   # no perder el valor actual
                     options = [raw] + options
@@ -277,6 +281,32 @@ def save_integrations(slug: str, form) -> None:
         updates['AI_NUBE_API_KEY'] = ''
     env.update(updates)
     _write_env(slug, env)
+    if slug == Config.PRIMARY_TENANT_SLUG:
+        _write_primary_ia_env(slug, env)
+
+
+# ── Instancia principal: solo la IA se administra desde aquí ───
+# La principal (cybershop.service) lee su .cybershop.conf, no este env. Para que
+# el Asistente IA y el respaldo Anthropic sí se configuren desde el maestro, al
+# guardar se copian SOLO esas claves a `<slug>.ia.env`, que su servicio carga con
+# un drop-in (deploy/cybershop-ia-env.conf). Pagos, correo y DIAN siguen en su
+# .cybershop.conf: un valor viejo guardado aquí no puede pisarlos.
+_GRUPOS_IA = ('Asistente IA (Ollama / OpenAI-compatible)', 'Respaldo de emergencia Anthropic')
+IA_KEYS = [f[0] for grp, fields in GROUPS if grp in _GRUPOS_IA for f in fields]
+_NUBE_KEYS = {k for k in IA_KEYS if k.startswith('AI_NUBE_')}
+
+
+def ia_env_path(slug: str) -> Path:
+    return env_path(slug).with_name(f'{slug}.ia.env')
+
+
+def _write_primary_ia_env(slug: str, env: dict) -> None:
+    """Las del respaldo Anthropic van aunque estén vacías (llave borrada =
+    respaldo apagado). Las del Asistente IA solo con valor: un campo sin llenar
+    no debe dejar a la principal sin servidor ni modelo."""
+    datos = {k: env[k] for k in IA_KEYS
+             if k in env and (k in _NUBE_KEYS or str(env[k]).strip())}
+    _write_env_file(ia_env_path(slug), datos)
 
 
 def set_env_values(slug: str, values: dict) -> None:
@@ -288,7 +318,10 @@ def set_env_values(slug: str, values: dict) -> None:
 
 
 def _write_env(slug: str, data: dict) -> None:
-    p = env_path(slug)
+    _write_env_file(env_path(slug), data)
+
+
+def _write_env_file(p: Path, data: dict) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     if p.is_symlink():
         raise ValueError('EnvironmentFile de instancia no puede ser un enlace simbólico')

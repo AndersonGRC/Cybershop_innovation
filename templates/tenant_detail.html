@@ -380,10 +380,11 @@
             o sin API Key. El contador local es estimado y no es un límite bancario: establece
             también un límite de gasto en Anthropic antes de activarlo.
             {% if tenant.slug != primary_slug %}Los cambios se aplican al reiniciar la instancia.{% endif %}</small></p>
-            {% if tenant.slug == primary_slug %}
-            <p><small class="muted">Esta es la instancia principal: actualmente lee su configuración
-            de .cybershop.conf. Los valores guardados aquí aún no se aplican al reiniciarla.</small></p>
             {% endif %}
+            {% if tenant.slug == primary_slug and grp.group in ('Asistente IA (Ollama / OpenAI-compatible)', 'Respaldo de emergencia Anthropic') %}
+            <p><small class="muted">Instancia principal: este grupo se guarda aparte ({{ tenant.slug }}.ia.env)
+            y se aplica al reiniciarla (Técnico → Reiniciar). El resto de integraciones sigue en su
+            .cybershop.conf.</small></p>
             {% endif %}
             <div class="grid-2">
                 {% for f in grp.fields %}
@@ -392,17 +393,16 @@
                     <select name="{{ f.key }}">
                         {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
                     </select>
-                    {% elif f.type == 'datalist' %}
-                    <input type="text" name="{{ f.key }}" value="{{ f.value }}" list="dl_{{ f.key }}"
-                           autocomplete="off" placeholder="Elige o escribe el modelo…">
-                    <datalist id="dl_{{ f.key }}">{% for opt in f.options %}<option value="{{ opt }}"></option>{% endfor %}</datalist>
-                    {% if f.key == 'AI_MODEL' %}
+                    {% elif f.type == 'modelos' %}
+                    <select name="{{ f.key }}" id="ai-model-select">
+                        {% if not f.options %}<option value="" selected>— Enciende tu equipo de IA y pulsa «Actualizar modelos» —</option>{% endif %}
+                        {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+                    </select>
                     <span class="ai-model-tools" style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
                         <button type="button" class="secondary outline" id="ai-refresh-btn" style="margin:0;width:auto;padding:.25rem .6rem"
                                 data-url="{{ url_for('tenants.ai_models', tenant_id=tenant.id) }}">🔄 Actualizar modelos</button>
                         <small class="muted" id="ai-model-status"></small>
                     </span>
-                    {% endif %}
                     {% elif f.secret %}
                     <input type="password" name="{{ f.key }}" value="" autocomplete="new-password"
                            placeholder="{{ f.masked if f.has_value else '(no configurado)' }}">
@@ -433,7 +433,7 @@
         var btn = document.getElementById('ai-refresh-btn');
         if(!btn) return;
         var status = document.getElementById('ai-model-status');
-        var dl = document.getElementById('dl_AI_MODEL');
+        var select = document.getElementById('ai-model-select');
         var baseInput = document.querySelector('#tab-integraciones [name="AI_BASE_URL"]');
         var loaded = false;
         function refresh(){
@@ -444,14 +444,24 @@
                 .then(function(r){ return r.json(); })
                 .then(function(j){
                     if(j.models && j.models.length){
-                        dl.innerHTML = j.models.map(function(m){
-                            return '<option value="' + m.replace(/"/g,'&quot;') + '"></option>'; }).join('');
+                        // La lista nueva conserva el modelo elegido aunque ya no esté
+                        // en el servidor, para no cambiarlo sin que el operador lo note.
+                        var actual = select.value;
+                        var modelos = j.models.slice();
+                        if(actual && modelos.indexOf(actual) < 0){ modelos.unshift(actual); }
+                        select.innerHTML = '';
+                        modelos.forEach(function(m){
+                            var opt = document.createElement('option');
+                            opt.value = m; opt.textContent = m;
+                            if(m === actual){ opt.selected = true; }
+                            select.appendChild(opt);
+                        });
                         status.textContent = ' ' + j.models.length + ' modelos disponibles ✓';
                     } else {
-                        status.textContent = ' Tu PC de IA esta apagada o inalcanzable. Puedes escribir el modelo a mano.';
+                        status.textContent = ' Tu PC de IA está apagada o inalcanzable: se conserva la última lista conocida.';
                     }
                 })
-                .catch(function(){ status.textContent = ' No se pudo consultar (escribe el modelo a mano).'; })
+                .catch(function(){ status.textContent = ' No se pudo consultar: se conserva la última lista conocida.'; })
                 .finally(function(){ btn.disabled = false; });
         }
         btn.addEventListener('click', refresh);

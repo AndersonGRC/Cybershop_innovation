@@ -298,8 +298,9 @@ def integraciones_save(tenant_id):
                                     actor=_por(), detalle='claves=' + ','.join(changed))
         from config import Config as _Cfg
         if tenant['slug'] == _Cfg.PRIMARY_TENANT_SLUG:
-            flash('Valores guardados, pero la instancia principal lee .cybershop.conf; '
-                  'estos cambios todavía no se aplican desde este panel.', 'warning')
+            flash('Valores guardados. En la instancia principal, el Asistente IA y el respaldo '
+                  'Anthropic se aplican al reiniciarla (Técnico → Reiniciar); el resto de '
+                  'integraciones sigue en su .cybershop.conf.', 'warning')
         else:
             flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente.', 'success')
     except Exception as exc:  # noqa: BLE001

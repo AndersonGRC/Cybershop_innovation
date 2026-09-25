@@ -337,6 +337,19 @@ sudo -u www-data venv/bin/python tools/apply_migrations.py      # migraciones de
 sudo systemctl restart cybershop-admin
 ```
 
+### Instancia principal: IA administrada desde el maestro (una sola vez)
+La principal (`cybershop.service`) lee su `.cybershop.conf`. Al guardar
+Integraciones de la principal, el maestro escribe SOLO los ajustes de IA
+(Asistente IA + respaldo Anthropic) en `/etc/cybershop/<slug>.ia.env`. Para que
+la principal los cargue:
+```bash
+sudo install -D -m 644 deploy/cybershop-ia-env.conf \
+    /etc/systemd/system/cybershop.service.d/ia-env.conf
+sudo systemctl daemon-reload && sudo systemctl restart cybershop
+```
+Antes de instalarlo, comparar los `AI_BASE_URL`/`AI_MODEL` de ese archivo con los
+de `.cybershop.conf`: los del archivo ganan. Pagos, correo y DIAN no se tocan.
+
 ### Reglas de oro
 - **Migraciones de tenant SOLO aditivas e idempotentes** (`IF NOT EXISTS`). Nunca DROP/ALTER destructivo. Ver `migrations/tenant/README.md`.
 - `migrate_tenants.py` es seguro de re-correr: salta lo ya aplicado por cliente.
