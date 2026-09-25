@@ -33,6 +33,7 @@ MODULES = [
     ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
     ('ai_actions', 'Acciones operativas con IA', 'Permite preparar ajustes de inventario y cambios de contactos desde el panel IA. Cada cambio exige confirmación humana y se registra en la BD del cliente. Apagado por defecto.', 'inteligencia', 'ia_acciones_habilitadas', False),
     ('ai_public', 'Chat del sitio', 'Chatbot IA en el sitio publico del cliente: productos, servicios, horarios y preguntas frecuentes, con SU informacion. Sin acceso a contabilidad ni datos de clientes.', 'inteligencia', 'chat_publico_habilitado', False),
+    ('ai_public_compat', 'Chat del sitio — compatibilidad con IA local', 'Responde si un producto ya encontrado es compatible usando el modelo de IA del propio equipo (nunca la nube), solo si ya esta cargado; si no, ofrece WhatsApp. Requiere Chat del sitio activo. Apagado por defecto.', 'inteligencia', 'chat_publico_compat_habilitado', False),
     ('bulk_upload', 'Cargue masivo', 'Importación masiva de productos y géneros por Excel. Al desactivarlo, esos botones desaparecen del panel del cliente.', 'catalogo', 'cargue_masivo_habilitado', True),
 ]
 
@@ -46,7 +47,7 @@ PLAN_MODULES = {
     'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'bulk_upload'},
     'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
                  'billing', 'coupons', 'wishlist', 'crm', 'support', 'bulk_upload'},
-    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public', 'ai_actions'},
+    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public', 'ai_actions', 'ai_public_compat'},
 }
 PLANS = list(PLAN_MODULES.keys())
 
