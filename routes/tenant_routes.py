@@ -296,13 +296,10 @@ def integraciones_save(tenant_id):
         if changed:
             audit_service.registrar('integraciones_actualizadas', tenant_id=tenant_id,
                                     actor=_por(), detalle='claves=' + ','.join(changed))
-        from config import Config as _Cfg
-        if tenant['slug'] == _Cfg.PRIMARY_TENANT_SLUG:
-            flash('Valores guardados. En la instancia principal, el Asistente IA y el respaldo '
-                  'Anthropic se aplican al reiniciarla (Técnico → Reiniciar); el resto de '
-                  'integraciones sigue en su .cybershop.conf.', 'warning')
-        else:
-            flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente.', 'success')
+        # También la principal: su cybershop.service carga /etc/cybershop/<slug>.env con
+        # el drop-in instance-env.conf, y esos valores ganan a su .cybershop.conf.
+        flash('Integraciones guardadas. Se aplican al reiniciar la instancia del cliente '
+              '(Técnico → Reiniciar).', 'success')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error guardando integraciones: {exc}', 'error')
     return redirect(url_for('tenants.detail', tenant_id=tenant_id) + '#integraciones')

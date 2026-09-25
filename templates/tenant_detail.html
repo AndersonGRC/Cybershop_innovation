@@ -378,13 +378,9 @@
             {% if grp.group == 'Respaldo de emergencia Anthropic' %}
             <p><small>Se configura por cliente. El respaldo queda apagado con presupuesto 0 USD
             o sin API Key. El contador local es estimado y no es un límite bancario: establece
-            también un límite de gasto en Anthropic antes de activarlo.
-            {% if tenant.slug != primary_slug %}Los cambios se aplican al reiniciar la instancia.{% endif %}</small></p>
-            {% endif %}
-            {% if tenant.slug == primary_slug and grp.group in ('Asistente IA (Ollama / OpenAI-compatible)', 'Respaldo de emergencia Anthropic') %}
-            <p><small class="muted">Instancia principal: este grupo se guarda aparte ({{ tenant.slug }}.ia.env)
-            y se aplica al reiniciarla (Técnico → Reiniciar). El resto de integraciones sigue en su
-            .cybershop.conf.</small></p>
+            también un límite de gasto en Anthropic antes de activarlo. La API Key debe estar
+            creada dentro de un workspace de Anthropic. Los cambios se aplican al reiniciar la
+            instancia (Técnico → Reiniciar).</small></p>
             {% endif %}
             <div class="grid-2">
                 {% for f in grp.fields %}

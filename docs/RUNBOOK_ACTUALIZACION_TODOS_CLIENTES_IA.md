@@ -180,8 +180,11 @@ código de salida no certifica éxito por cliente.
    ia_acciones_pendientes **en la BD asignada al primario**, servicio activo,
    panel IA de solo lectura, datos/identidad/branding y flags apagados. El
    campo version del health puede ser genérico: usar SHA Git como evidencia.
-   La instancia principal lee .cybershop.conf, no el env de Integraciones del
-   maestro; no inferir de esa pantalla que Anthropic esté configurado o activo.
+   La instancia principal también carga el env de Integraciones (drop-in
+   instance-env.conf → /etc/cybershop/cyber-t001.env), que gana a su
+   .cybershop.conf, pero solo al reiniciarla: una recarga no relee el env.
+   Verificado el 2026-09-25 en /proc/<PID>/environ. Para saber si Anthropic
+   está activo, mirar la tarjeta «Estado del servicio» del panel IA (v1.2.2.0+).
 4. **Activos restantes, uno por vez.** Para cada id/slug obtenido del
    inventario: registrar BD y puerto/servicio; respaldo reciente; estado y
    conteos no sensibles de tablas críticas; pulsar su «Actualizar app»; luego

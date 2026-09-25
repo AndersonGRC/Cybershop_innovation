@@ -72,49 +72,6 @@ class EmergencyIntegrationTests(unittest.TestCase):
             with self.subTest(slug=slug), self.assertRaises(ValueError):
                 integrations.env_path(slug)
 
-    # ── Instancia principal: solo la IA sale a su archivo aparte ──
-    def _principal(self):
-        slug_patch = patch.object(integrations.Config, 'PRIMARY_TENANT_SLUG', 'principal')
-        slug_patch.start()
-        self.addCleanup(slug_patch.stop)
-        return 'principal'
-
-    def test_primary_gets_only_ai_keys_in_its_ia_env(self):
-        slug = self._principal()
-        integrations.save_integrations(slug, {
-            'PAYU_API_KEY': 'no-debe-salir', 'MAIL_USERNAME': 'correo@x.co',
-            'AI_BASE_URL': 'http://pc:11434', 'AI_MODEL': 'gpt-oss-cyber',
-            'AI_NUBE_API_KEY': 'clave-ws', 'AI_NUBE_PRESUPUESTO_USD': '5',
-            'AI_NUBE_PARA_PUBLICO': 'true',
-        })
-        ia = integrations.read_env_file(integrations.ia_env_path(slug))
-        self.assertEqual(ia['AI_MODEL'], 'gpt-oss-cyber')
-        self.assertEqual(ia['AI_NUBE_API_KEY'], 'clave-ws')
-        self.assertEqual(ia['AI_NUBE_PRESUPUESTO_USD'], '5')
-        self.assertEqual(ia['AI_NUBE_PARA_PUBLICO'], 'true')
-        self.assertTrue(set(ia) <= set(integrations.IA_KEYS))
-        self.assertNotIn('PAYU_API_KEY', ia)
-        self.assertNotIn('MAIL_USERNAME', ia)
-
-    def test_other_tenants_do_not_get_an_ia_env(self):
-        self._principal()
-        integrations.save_integrations('cliente-a', {'AI_MODEL': 'qwen2.5:7b'})
-        self.assertFalse(integrations.ia_env_path('cliente-a').exists())
-
-    def test_empty_model_never_blanks_the_primary(self):
-        slug = self._principal()
-        integrations.save_integrations(slug, {'AI_MODEL': '', 'AI_BASE_URL': ''})
-        ia = integrations.read_env_file(integrations.ia_env_path(slug))
-        self.assertNotIn('AI_MODEL', ia)
-        self.assertNotIn('AI_BASE_URL', ia)
-
-    def test_clearing_the_key_turns_the_primary_backup_off(self):
-        slug = self._principal()
-        integrations.save_integrations(slug, {'AI_NUBE_API_KEY': 'clave-ws'})
-        integrations.save_integrations(slug, {'AI_NUBE_API_KEY_CLEAR': '1'})
-        ia = integrations.read_env_file(integrations.ia_env_path(slug))
-        self.assertEqual(ia['AI_NUBE_API_KEY'], '')
-
     # ── El modelo se elige de una lista, no se escribe ──
     def test_model_is_a_dropdown_that_keeps_the_current_value(self):
         integrations.save_integrations('cliente-a', {'AI_MODEL': 'modelo-viejo'})
