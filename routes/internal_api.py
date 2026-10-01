@@ -90,3 +90,54 @@ def suspend_internal(tenant_id):
 def reactivate_internal(tenant_id):
     """Reactiva la instancia (renovación pagada)."""
     return _accion_lifecycle(tenant_id, 'reactivate')
+
+
+# ──────────────────────────────────────────────
+# Prueba gratis: disponibilidad de subdominio y modo prueba
+# ──────────────────────────────────────────────
+
+# Subdominios que no se entregan a un cliente (infraestructura y marca).
+SLUGS_RESERVADOS = {
+    'www', 'admin', 'api', 'app', 'mail', 'smtp', 'ftp', 'panel', 'master', 'maestro',
+    'soporte', 'support', 'static', 'cdn', 'dev', 'test', 'staging', 'demo', 'cybershop',
+    'portaltributario', 'dian', 'ia', 'ollama', 'login', 'pagos', 'billing',
+}
+
+
+@bp.route('/tenants/slug-disponible', methods=['GET'])
+@require_internal_key
+def slug_disponible():
+    """Solo lectura: ¿se puede crear un cliente con este subdominio?
+    Reusa la validación de create_tenant; no reserva nada."""
+    import tenant_service
+    try:
+        slug = tenant_service.validate_slug(request.args.get('slug'))
+    except tenant_service.TenantCreationError as exc:
+        return jsonify({'disponible': False, 'motivo': str(exc)}), 200
+    if slug in SLUGS_RESERVADOS:
+        return jsonify({'disponible': False, 'motivo': 'Ese nombre está reservado.'}), 200
+    if tenant_service._slug_exists(slug):
+        return jsonify({'disponible': False, 'motivo': 'Ese nombre ya está en uso.'}), 200
+    return jsonify({'disponible': True}), 200
+
+
+@bp.route('/tenants/<int:tenant_id>/modo-prueba', methods=['POST'])
+@require_internal_key
+def modo_prueba(tenant_id):
+    """Prueba gratis: apaga (activo=true) o devuelve (activo=false) las
+    integraciones externas de la tienda y reinicia su instancia para que
+    relea el entorno. No toca la BD ni la creación del cliente."""
+    import provisioning_service
+    import tenant_service
+    import trial_mode_service
+    tenant = tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        return jsonify({'error': 'Tenant no existe'}), 404
+    activo = bool((request.get_json(silent=True) or {}).get('activo', True))
+    slug = tenant['slug']
+    try:
+        llaves = trial_mode_service.aplicar(slug) if activo else trial_mode_service.quitar(slug)
+        reinicio = provisioning_service.restart_service(slug)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'error': f'No se pudo cambiar el modo prueba: {exc}'}), 500
+    return jsonify({'ok': True, 'activo': activo, 'llaves': llaves, 'reinicio': reinicio}), 200

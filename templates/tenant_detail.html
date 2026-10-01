@@ -547,6 +547,13 @@
             El cliente recibe <strong>recordatorios automáticos por correo</strong>
             ({{ billing.motor.buyer_email }}) y puede pagar solo con su link.
         </p>
+        <p>
+            <strong>Contacto:</strong> {{ billing.motor.buyer_nombre or '—' }} ·
+            {% if billing.motor.buyer_telefono %}
+                WhatsApp {{ billing.motor.buyer_telefono }}
+                {% if billing.motor.whatsapp_url %}<a href="{{ billing.motor.whatsapp_url }}" target="_blank" rel="noopener">(escribirle)</a>{% endif %}
+            {% else %}<em>sin teléfono registrado</em>{% endif %}
+        </p>
         <table>
             <tr><td>Plan (motor)</td><td>{{ billing.motor.plan_key }}</td></tr>
             <tr><td>Próximo cobro (motor)</td><td>{{ billing.motor.proximo_pago or '—' }}</td></tr>

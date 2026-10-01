@@ -149,6 +149,13 @@ def get_billing(tenant_id: int) -> dict:
     }
 
 
+def _whatsapp_url(telefono):
+    digitos = ''.join(ch for ch in str(telefono or '') if ch.isdigit())
+    if len(digitos) == 10:
+        digitos = '57' + digitos
+    return f'https://wa.me/{digitos}' if len(digitos) >= 11 else None
+
+
 def get_motor_info(tenant_id: int):
     """Estado del MOTOR de cobro automático (tabla plan_compras en la BD del
     tenant operador, id=1): próximo pago, último recordatorio, si es prueba
@@ -167,7 +174,8 @@ def get_motor_info(tenant_id: int):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     "SELECT plan_key, proximo_pago, ultimo_recordatorio, es_trial, "
-                    "       suspendida_por_pago, token_renovacion, buyer_email "
+                    "       suspendida_por_pago, token_renovacion, buyer_email, "
+                    "       buyer_telefono, buyer_nombre "
                     "FROM plan_compras WHERE tenant_id = %s AND estado = 'ACTIVADA' "
                     "ORDER BY id DESC LIMIT 1",
                     (tenant_id,))
@@ -183,6 +191,9 @@ def get_motor_info(tenant_id: int):
             'es_trial': bool(m.get('es_trial')),
             'suspendida_por_pago': bool(m['suspendida_por_pago']),
             'buyer_email': m['buyer_email'],
+            'buyer_telefono': m.get('buyer_telefono') or '',
+            'buyer_nombre': m.get('buyer_nombre') or '',
+            'whatsapp_url': _whatsapp_url(m.get('buyer_telefono')),
             'link_pago': (f"https://cybershopcol.com/renovar/{m['token_renovacion']}"
                           if m['token_renovacion'] else None),
         }
