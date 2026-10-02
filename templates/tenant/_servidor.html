@@ -1,0 +1,188 @@
+{#- Servidor: actualizar, dominio, salud, zona horaria, auditoría, información y peligro. -#}
+{% set estado_es = {'pending':'pendiente','running':'activa','stopped':'detenida','cancelled':'cancelada'} %}
+
+<article class="card">
+    <h3>Actualizar la app del cliente</h3>
+    <p class="muted">Integra el código web compartido, migra <strong>solo la BD de este cliente</strong> y recarga
+       <strong>solo su instancia</strong>. Se bloquea si hay cambios del sitio público pendientes: en ese caso usa
+       «Deploy completo» en las acciones avanzadas. No actualiza este panel maestro, el escritorio, dependencias,
+       variables de entorno ni el unit systemd.</p>
+    <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+          onsubmit="return confirm('Integra código COMPARTIDO para todas las instancias, migra SOLO la BD de este cliente y recarga SOLO su proceso. Requiere haber actualizado el maestro y publicado ambos repositorios. No aplica env, dependencias ni escritorio. ¿Continuar?')">
+        <input type="hidden" name="accion" value="update">
+        <button type="submit">⬆ Actualizar app (después del login)</button>
+    </form>
+
+    <details class="acciones-avanzadas">
+        <summary>Acciones avanzadas</summary>
+        <div class="acciones-fila">
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+                  onsubmit="return confirm('DEPLOY COMPLETO: trae TODO el código de master, INCLUIDO el sitio público (antes del login). Úsalo solo si los cambios públicos son intencionales. ¿Continuar?')">
+                <input type="hidden" name="accion" value="update">
+                <input type="hidden" name="include_public" value="1">
+                <button class="secondary outline btn-small" type="submit">🌐 Deploy completo (incluye público)</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+                  onsubmit="return confirm('Reinicia la instancia del cliente (unos segundos sin servicio). ¿Continuar?')">
+                <input type="hidden" name="accion" value="restart"><button class="secondary outline btn-small" type="submit">Reiniciar instancia</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+                  onsubmit="return confirm('Aplica migraciones aditivas a la BD de este cliente. ¿Continuar?')">
+                <input type="hidden" name="accion" value="migrate"><button class="secondary outline btn-small" type="submit">Solo migrar BD</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}">
+                <input type="hidden" name="accion" value="sync_status"><button class="secondary outline btn-small" type="submit">Sincronizar estado</button>
+            </form>
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+                  onsubmit="return confirm('Reaprovisionar vuelve a crear la configuración de la instancia (puerto, unit y proxy). ¿Continuar?')">
+                <input type="hidden" name="accion" value="reprovision"><button class="secondary outline btn-small" type="submit">Reaprovisionar</button>
+            </form>
+            {% if tenant.slug == primary_slug %}
+            <form method="post" action="{{ url_for('tenants.instancia_accion', tenant_id=tenant.id) }}"
+                  onsubmit="return confirm('Detiene y deshabilita el unit fantasma cybershop@{{ tenant.slug }} (crash-loop). NO toca el sitio principal (cybershop.service). ¿Continuar?')">
+                <input type="hidden" name="accion" value="repair"><button class="secondary outline btn-small" type="submit">🛠 Reparar instancia</button>
+            </form>
+            {% endif %}
+        </div>
+        <p class="muted">Si falla la migración o la recarga, el código global puede haber cambiado: verifica el estado antes de reintentar.</p>
+    </details>
+</article>
+
+<article class="card">
+    <h3>Dominio</h3>
+    <div class="dns-hint">
+        <strong>Paso 1 · DNS</strong> (en Cloudflare): registro <code>A</code> del subdominio o dominio hacia
+        <code class="ip">{{ server_ip }}</code>.
+        <br><small class="muted">El subdominio puede ir cubierto por el comodín <code>*.cybershopcol.com</code>.</small>
+    </div>
+    <form method="post" action="{{ url_for('tenants.dominio_save', tenant_id=tenant.id) }}" class="dominio-form">
+        <strong>Paso 2 · Asigna el dominio</strong>
+        <div class="grid-2">
+            <label>Subdominio
+                <input type="text" name="subdominio" value="{{ runtime.subdomain if runtime else tenant.slug }}"
+                       placeholder="{{ tenant.slug }}" pattern="[a-z0-9-]+" title="minúsculas, números y guiones">
+                <small class="muted">Se publica como <code>&lt;subdominio&gt;.cybershopcol.com</code></small>
+            </label>
+            <label>Dominio propio (opcional)
+                <input type="text" name="dominio_propio" value="{{ (runtime.custom_domain or '') if runtime else '' }}"
+                       placeholder="ej. sutienda.com" pattern="[a-z0-9.-]+\.[a-z]{2,}" title="ej. sutienda.com">
+                <small class="muted">Requiere el registro DNS del paso 1.</small>
+            </label>
+        </div>
+        <button type="submit">Guardar dominio y publicar</button>
+    </form>
+    <table>
+        <tr><th scope="row">URL del sitio</th><td>
+            {% if runtime and runtime.custom_domain %}<code>https://{{ runtime.custom_domain }}</code> <span class="badge badge-success">dominio propio</span>
+            {% elif runtime %}<code>https://{{ runtime.subdomain }}.cybershopcol.com</code>
+            {% else %}—{% endif %}
+        </td></tr>
+        <tr><th scope="row">Puerto</th><td>{% if runtime and runtime.port %}<code>127.0.0.1:{{ runtime.port }}</code>{% else %}— (sin asignar){% endif %}</td></tr>
+        <tr><th scope="row">Instancia</th>
+            <td>{% if runtime %}<span class="badge {{ 'badge-success' if runtime.instance_status=='running' else 'badge-warning' }}">{{ estado_es.get(runtime.instance_status, runtime.instance_status) }}</span>
+                {% else %}<span class="badge badge-muted">sin aprovisionar</span>{% endif %}</td>
+        </tr>
+    </table>
+    {% if proxy_preview %}
+    <details>
+        <summary>Ver configuración del proxy ({{ proxy_backend }})</summary>
+        <pre class="proxy-pre">{{ proxy_preview }}</pre>
+        <small class="muted">El maestro escribe este bloque en el servidor y recarga {{ proxy_backend }}. Aquí solo es previsualización.</small>
+    </details>
+    {% endif %}
+</article>
+
+<article class="card">
+    <h3>Salud y respaldo</h3>
+    {% if health %}
+    <table>
+        <tr><th scope="row">Instancia (proceso)</th><td>
+            {% if health.service_active %}<span class="badge badge-success">activa</span>
+            {% else %}<span class="badge badge-warning">detenida</span>{% endif %}
+        </td></tr>
+        <tr><th scope="row">App responde</th><td>
+            {% if health.http_ok %}<span class="badge badge-success">sí</span>
+                <small class="muted">estado: {{ health.status }} · BD: {{ health.db }} · Redis: {{ health.redis }}</small>
+            {% else %}<span class="badge badge-warning">no responde</span>
+                {% if health.detail %}<small class="muted">{{ health.detail }}</small>{% endif %}
+            {% endif %}
+        </td></tr>
+    </table>
+    {% else %}
+    <p class="muted">No se pudo consultar el estado en este momento.</p>
+    {% endif %}
+    {% if tenant.db_name %}
+    <a class="secondary" role="button" href="{{ url_for('tenants.backup_download', tenant_id=tenant.id) }}">⬇ Respaldar y descargar BD (.sql.gz)</a>
+    <p class="muted">Genera un pg_dump al instante y lo descarga a tu equipo. Guárdalo fuera del servidor.</p>
+    {% else %}
+    <p><em>El cliente no tiene BD aprovisionada; no se puede respaldar.</em></p>
+    {% endif %}
+</article>
+
+<article class="card">
+    <h3>Zona horaria</h3>
+    <p class="muted">Las fechas de este cliente (ventas, POS, contabilidad, mesas…) se registran en esta zona. Aplica a los
+       registros nuevos; los anteriores no cambian. Al guardar se reinicia la instancia.</p>
+    <form method="post" action="{{ url_for('tenants.zona_horaria_save', tenant_id=tenant.id) }}" class="plan-row">
+        <select name="timezone" aria-label="Zona horaria">
+            {% for iana, etiqueta, offset in timezones %}
+            <option value="{{ iana }}" {% if iana == tz_actual %}selected{% endif %}>{{ etiqueta }} · {{ offset }} ({{ iana }})</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Guardar y aplicar</button>
+    </form>
+</article>
+
+<article class="card">
+    <h3>Auditoría de acciones sensibles</h3>
+    <p class="muted">Suspensiones, reactivaciones, destrucciones, pagos y cambios del aviso: quién y cuándo. Registro solo de escritura.</p>
+    {% if auditoria %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col">Fecha (UTC-5)</th><th scope="col">Acción</th><th scope="col">Actor</th><th scope="col">Detalle</th></tr></thead>
+        <tbody>
+        {% for a in auditoria %}
+        <tr>
+            <td>{{ a.ts.strftime('%Y-%m-%d %H:%M') if a.ts else '' }}</td>
+            <td><code>{{ a.accion }}</code></td>
+            <td>{{ a.actor }}</td>
+            <td><small class="muted">{{ a.detalle or '' }}</small></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p><span class="badge badge-muted">Sin registros aún</span></p>
+    {% endif %}
+</article>
+
+<article class="card">
+    <h3>Información técnica</h3>
+    <table>
+        <tr><th scope="row">Tenant ID</th><td>{{ tenant.id }}</td></tr>
+        <tr><th scope="row">Slug</th><td><code>{{ tenant.slug }}</code></td></tr>
+        <tr><th scope="row">Plan</th><td>{{ tenant.plan }}</td></tr>
+        <tr><th scope="row">BD</th><td><code>{{ tenant.db_name }}</code></td></tr>
+        <tr><th scope="row">BD host</th><td>{{ tenant.db_host }}:{{ tenant.db_port }}</td></tr>
+        <tr><th scope="row">Versión del esquema</th><td>{{ tenant.schema_version }}</td></tr>
+        <tr><th scope="row">Alta</th><td>{{ tenant.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    </table>
+</article>
+
+<details class="card danger-zone">
+    <summary><h3>Zona de peligro</h3></summary>
+    <p class="muted">Escribe el slug <code>{{ tenant.slug }}</code> para confirmar. <strong>Cancelar</strong> hace backup y conserva la BD (reversible).
+       <strong>Eliminar</strong> hace backup y BORRA la BD (irreversible).</p>
+    <form method="post" action="{{ url_for('tenants.destroy', tenant_id=tenant.id) }}"
+          onsubmit="return confirm('¿Seguro? mode=' + this.mode.value);">
+        <div class="plan-row">
+            <input type="text" name="confirm_slug" placeholder="Escribe: {{ tenant.slug }}" required aria-label="Confirmación con el slug">
+            <select name="mode" aria-label="Tipo de baja">
+                <option value="soft">Cancelar + backup (conservar BD)</option>
+                <option value="hard">Eliminar + backup (DROP BD)</option>
+            </select>
+            <button type="submit" class="contrast">Ejecutar</button>
+        </div>
+    </form>
+</details>

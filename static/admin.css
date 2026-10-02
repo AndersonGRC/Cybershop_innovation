@@ -245,3 +245,168 @@ form .grid {
 .dns-hint { background: linear-gradient(135deg,#eef3ff,#f6f8fc); border:1px solid #dfe5f2; border-radius:10px; padding:.8rem 1rem; font-size:.92rem; }
 .dns-hint .ip { background:#122C94; color:#fff; padding:.1rem .5rem; border-radius:6px; font-weight:700; }
 .proxy-pre { background:#0e1830; color:#cfe0ff; padding:1rem; border-radius:10px; overflow-x:auto; font-size:.82rem; line-height:1.45; margin:.6rem 0 .2rem; }
+
+/* ============================================================
+   Ficha del cliente v2: resumen, pestañas por tarea y accesibilidad
+   ============================================================ */
+:root {
+    --cs-text: #1f2937;
+    --cs-text-soft: #4b5563;
+    --cs-ok-bg: #ecfdf5;
+    --cs-ok-text: #065f46;
+    --cs-warn-bg: #fffbeb;
+    --cs-warn-border: #fcd34d;
+    --cs-warn-text: #92400e;
+    --cs-danger-bg: #fef2f2;
+    --cs-danger-border: #fca5a5;
+    --cs-danger-text: #991b1b;
+    --cs-info-bg: #eff6ff;
+    --cs-info-border: #93c5fd;
+    --cs-info-text: #1e40af;
+    --cs-white: #ffffff;
+}
+
+[hidden] { display: none !important; }
+
+/* Foco visible para teclado */
+a:focus-visible, button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid var(--cs-primary);
+    outline-offset: 2px;
+}
+
+.muted { color: var(--cs-text-soft); }
+small.muted, p.muted { font-size: .88rem; }
+.badge-info { background: var(--cs-info-bg); color: var(--cs-info-text); border: 1px solid var(--cs-info-border); }
+
+/* Cabecera de la ficha */
+.ficha-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;
+    margin: .2rem 0 1rem;
+}
+.ficha-id h1 { margin: 0 0 .35rem; color: var(--cs-primary-dark); }
+.ficha-meta { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0; }
+.ficha-acciones { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.ficha-acciones form, .ficha-acciones a, .ficha-acciones button { margin: 0; }
+
+/* Pestañas fijas al desplazarse */
+.tabbar {
+    position: sticky; top: 0; z-index: 5; background: var(--cs-white);
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin;
+}
+.tabbar .tab { white-space: nowrap; }
+.tab-alerta { color: var(--cs-danger-text); }
+.tabpanel[hidden] { display: none; }
+
+/* Resumen */
+.resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.resumen-card p { margin: .2rem 0; }
+.resumen-card a[data-ir] { display: inline-block; margin-top: .4rem; font-weight: 600; }
+.avisos { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.aviso {
+    display: flex; justify-content: space-between; gap: 1rem; align-items: center; flex-wrap: wrap;
+    padding: .6rem .9rem; border-radius: 10px; border-left: 4px solid; list-style: none;
+}
+.aviso-warning { background: var(--cs-warn-bg); border-color: var(--cs-warn-border); color: var(--cs-warn-text); }
+.aviso-danger { background: var(--cs-danger-bg); border-color: var(--cs-danger-border); color: var(--cs-danger-text); }
+.aviso a { font-weight: 700; white-space: nowrap; }
+
+/* Filas de acciones y guardado */
+.acciones-fila { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
+.acciones-fila form, .acciones-fila button, .acciones-fila [role="button"] { margin: 0; }
+.barra-guardar {
+    position: sticky; bottom: 0; z-index: 4; background: var(--cs-white);
+    border-top: 1px solid var(--cs-border); padding: .7rem 0; margin-bottom: 1rem;
+}
+.barra-guardar button { margin: 0; }
+.bloque-titulo { margin: 1.6rem 0 .6rem; color: var(--cs-primary-dark); font-size: 1.12rem; }
+.intro { margin-bottom: .8rem; }
+
+/* Sitio público */
+.plantillas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: .6rem 0; }
+.pl-card {
+    position: relative; display: flex; flex-direction: column; gap: 5px; cursor: pointer;
+    border: 2px solid var(--cs-border); border-radius: 12px; padding: 14px; background: var(--cs-white); margin: 0;
+}
+.pl-card input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pl-card:has(input:checked) { border-color: var(--cs-primary); box-shadow: 0 0 0 3px var(--pico-primary-focus); }
+.pl-card:focus-within { outline: 3px solid var(--cs-primary); outline-offset: 2px; }
+.pl-icono {
+    height: 44px; border-radius: 8px; display: grid; place-items: center; font-size: 1.4rem;
+    background: linear-gradient(135deg, var(--cs-primary), var(--cs-primary-dark));
+}
+.pl-actual { color: var(--cs-ok-text); font-size: .8rem; }
+.logo-fila { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+.logo-actual { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.logo-actual img {
+    height: 64px; max-width: 240px; object-fit: contain; background: var(--cs-primary-dark);
+    border-radius: 8px; padding: 8px;
+}
+.logo-form { margin: 0; }
+.color-section-title {
+    margin: 1rem 0 .4rem; padding-left: .5rem; border-left: 4px solid var(--cs-primary);
+    font-size: 1rem; color: var(--cs-primary-dark);
+}
+.color-grupo { border: 1px solid var(--cs-border); border-radius: 10px; padding: .5rem .8rem; margin: .45rem 0; background: var(--cs-bg-soft); }
+.color-grupo > summary { font-weight: 600; color: var(--cs-primary-dark); cursor: pointer; }
+.color-grupo[open] > summary { margin-bottom: .6rem; }
+
+/* IA */
+.estado-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.estado-lista li { list-style: none; }
+.ai-model-tools { display: flex; gap: .5rem; align-items: center; margin-top: .25rem; }
+.ai-model-tools button { margin: 0; width: auto; }
+
+/* Cobros */
+.input-copiar { width: 100%; font-size: 12px; margin: 0; }
+.check-fila { display: flex; align-items: center; gap: 8px; }
+
+/* Servidor */
+.acciones-avanzadas { margin-top: 1rem; }
+.acciones-avanzadas > summary { font-weight: 600; cursor: pointer; color: var(--cs-primary-dark); }
+.dominio-form { margin-top: 1rem; }
+.danger-zone > summary { cursor: pointer; list-style: revert; }
+.danger-zone > summary h3 { display: inline; }
+
+.table-wrap { overflow-x: auto; }
+
+@media (max-width: 720px) {
+    .ficha-head { flex-direction: column; }
+    .plan-row { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tabpanel { animation: none; }
+}
+
+/* Menú: sección actual */
+.admin-nav a[aria-current="page"] {
+    color: var(--cs-primary);
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 var(--cs-primary);
+}
+.admin-nav { flex-wrap: wrap; gap: .5rem; }
+
+/* Lista de clientes */
+.lista-barra { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.lista-buscar { flex: 1 1 280px; margin: 0; }
+.lista-buscar input { margin: 0; }
+.sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
+}
+
+/* Contraste AA en textos y etiquetas grises */
+.badge-muted { color: var(--cs-text-soft); }
+.toggle-item small.muted, .stat-card .muted { color: var(--cs-text-soft); }
+
+/* Menú en pantallas angostas: los enlaces saltan de línea */
+@media (max-width: 720px) {
+    .admin-nav { padding: .5rem 1rem; }
+    .admin-nav ul { flex-wrap: wrap; gap: .4rem .9rem; }
+}
+
+/* Retoques de ritmo */
+form > .acciones-fila { margin-bottom: 1.2rem; }
+.toggle-item { align-items: flex-start; }
+.toggle-item input { margin-top: .25rem; flex-shrink: 0; }

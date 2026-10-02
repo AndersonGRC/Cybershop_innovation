@@ -1,0 +1,1073 @@
+{
+ "con_bd": [
+  {
+   "action": "/tenants/7/toggle",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/plantilla",
+   "editables": [
+    "plantilla_sitio"
+   ],
+   "enctype": "",
+   "envia": [
+    [
+     "plantilla_sitio",
+     "clasico"
+    ]
+   ],
+   "method": "post",
+   "opciones": [
+    [
+     "plantilla_sitio",
+     "clasico"
+    ],
+    [
+     "plantilla_sitio",
+     "elegante"
+    ],
+    [
+     "plantilla_sitio",
+     "innovador"
+    ],
+    [
+     "plantilla_sitio",
+     "ofertas"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/logo",
+   "editables": [
+    "logo"
+   ],
+   "enctype": "multipart/form-data",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/config",
+   "editables": [
+    "color_acento",
+    "color_acento_secundario",
+    "color_alerta_cancelar",
+    "color_alerta_confirmar",
+    "color_alerta_fondo",
+    "color_alerta_texto",
+    "color_botones",
+    "color_carrito",
+    "color_carrito_hover",
+    "color_exito",
+    "color_exito_hover",
+    "color_fondo_destacado",
+    "color_hover_menu",
+    "color_primario",
+    "color_primario_oscuro",
+    "color_producto_boton",
+    "color_producto_popup",
+    "color_secundario",
+    "color_software_acento",
+    "color_software_acento_texto",
+    "color_software_oscuro",
+    "color_software_primario",
+    "color_transicion",
+    "contacto_email_destino",
+    "empresa_copyright",
+    "empresa_direccion",
+    "empresa_email",
+    "empresa_facebook",
+    "empresa_instagram",
+    "empresa_linkedin",
+    "empresa_logo_url",
+    "empresa_maps_embed",
+    "empresa_nombre",
+    "empresa_tagline",
+    "empresa_telefono",
+    "empresa_twitter",
+    "empresa_website",
+    "empresa_whatsapp",
+    "empresa_youtube",
+    "home_about_body",
+    "home_about_intro",
+    "home_about_title",
+    "home_contacto_intro",
+    "home_contacto_titulo",
+    "home_lema_items",
+    "home_lema_subtitulo",
+    "home_lema_titulo",
+    "home_mision_texto",
+    "home_mision_titulo",
+    "home_publicaciones_titulo",
+    "home_vision_texto",
+    "home_vision_titulo",
+    "servicios_hero_subtitulo",
+    "servicios_hero_titulo"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/secciones",
+   "editables": [
+    "mostrar_about",
+    "mostrar_contacto",
+    "mostrar_login",
+    "mostrar_mapa",
+    "mostrar_mision_vision",
+    "mostrar_modulo_software",
+    "mostrar_modulo_ventas",
+    "mostrar_nav_productos",
+    "mostrar_nav_servicios",
+    "mostrar_publicaciones",
+    "mostrar_software_banner"
+   ],
+   "enctype": "",
+   "envia": [
+    [
+     "mostrar_about",
+     "on"
+    ],
+    [
+     "mostrar_contacto",
+     "on"
+    ],
+    [
+     "mostrar_login",
+     "on"
+    ],
+    [
+     "mostrar_mapa",
+     "on"
+    ],
+    [
+     "mostrar_mision_vision",
+     "on"
+    ],
+    [
+     "mostrar_modulo_software",
+     "on"
+    ],
+    [
+     "mostrar_modulo_ventas",
+     "on"
+    ],
+    [
+     "mostrar_nav_productos",
+     "on"
+    ],
+    [
+     "mostrar_nav_servicios",
+     "on"
+    ],
+    [
+     "mostrar_publicaciones",
+     "on"
+    ],
+    [
+     "mostrar_software_banner",
+     "on"
+    ]
+   ],
+   "method": "post",
+   "opciones": [
+    [
+     "mostrar_about",
+     "on"
+    ],
+    [
+     "mostrar_contacto",
+     "on"
+    ],
+    [
+     "mostrar_login",
+     "on"
+    ],
+    [
+     "mostrar_mapa",
+     "on"
+    ],
+    [
+     "mostrar_mision_vision",
+     "on"
+    ],
+    [
+     "mostrar_modulo_software",
+     "on"
+    ],
+    [
+     "mostrar_modulo_ventas",
+     "on"
+    ],
+    [
+     "mostrar_nav_productos",
+     "on"
+    ],
+    [
+     "mostrar_nav_servicios",
+     "on"
+    ],
+    [
+     "mostrar_publicaciones",
+     "on"
+    ],
+    [
+     "mostrar_software_banner",
+     "on"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/restaurante/modo-simple",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "on",
+     "1"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/restaurante/modo-simple",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "on",
+     "0"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/modulos",
+   "editables": [
+    "plan"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/modulos",
+   "editables": [
+    "modulo"
+   ],
+   "enctype": "",
+   "envia": [
+    [
+     "modulo",
+     "ai_assistant"
+    ],
+    [
+     "modulo",
+     "ai_public"
+    ],
+    [
+     "modulo",
+     "crm"
+    ],
+    [
+     "modulo",
+     "inventory"
+    ],
+    [
+     "modulo",
+     "orders"
+    ],
+    [
+     "modulo",
+     "pos"
+    ]
+   ],
+   "method": "post",
+   "opciones": [
+    [
+     "modulo",
+     "accounting"
+    ],
+    [
+     "modulo",
+     "ai_actions"
+    ],
+    [
+     "modulo",
+     "ai_assistant"
+    ],
+    [
+     "modulo",
+     "ai_public"
+    ],
+    [
+     "modulo",
+     "ai_public_compat"
+    ],
+    [
+     "modulo",
+     "billing"
+    ],
+    [
+     "modulo",
+     "bulk_upload"
+    ],
+    [
+     "modulo",
+     "caja"
+    ],
+    [
+     "modulo",
+     "content"
+    ],
+    [
+     "modulo",
+     "coupons"
+    ],
+    [
+     "modulo",
+     "crm"
+    ],
+    [
+     "modulo",
+     "facturacion_electronica"
+    ],
+    [
+     "modulo",
+     "inventory"
+    ],
+    [
+     "modulo",
+     "orders"
+    ],
+    [
+     "modulo",
+     "payroll"
+    ],
+    [
+     "modulo",
+     "pos"
+    ],
+    [
+     "modulo",
+     "quotes"
+    ],
+    [
+     "modulo",
+     "restaurant_tables"
+    ],
+    [
+     "modulo",
+     "share"
+    ],
+    [
+     "modulo",
+     "support"
+    ],
+    [
+     "modulo",
+     "users"
+    ],
+    [
+     "modulo",
+     "video"
+    ],
+    [
+     "modulo",
+     "wishlist"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/dian/provision",
+   "editables": [
+    "ambiente",
+    "dv",
+    "nit",
+    "prefijo",
+    "razon_social"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/dian/validate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/integraciones",
+   "editables": [
+    "AI_API_KEY",
+    "AI_BASE_URL",
+    "AI_MODEL",
+    "AI_NUBE_API_KEY",
+    "AI_NUBE_API_KEY_CLEAR",
+    "AI_NUBE_ESPERA_LOCAL_S",
+    "AI_NUBE_FALLOS_LOCAL_MIN",
+    "AI_NUBE_MAX_TOKENS",
+    "AI_NUBE_MODEL",
+    "AI_NUBE_PARA_PUBLICO",
+    "AI_NUBE_PRESUPUESTO_USD",
+    "AI_NUBE_TIMEOUT",
+    "BILLING_EMAIL",
+    "BILLING_ID",
+    "BILLING_NOMBRE",
+    "BILLING_TELEFONO",
+    "BILLING_TEXTO_PAGO",
+    "DIAN_API_KEY",
+    "DIAN_MASTER_KEY",
+    "DIAN_SERVICE_URL",
+    "DIAN_UI_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_LOGIN_REDIRECT_URI",
+    "GOOGLE_REDIRECT_URI",
+    "MAIL_DEFAULT_SENDER",
+    "MAIL_PASSWORD",
+    "MAIL_PORT",
+    "MAIL_SERVER",
+    "MAIL_USERNAME",
+    "META_CAPI_ACCESS_TOKEN",
+    "META_CAPI_TEST_EVENT_CODE",
+    "META_PIXEL_ID",
+    "PAYU_ACCOUNT_ID",
+    "PAYU_API_KEY",
+    "PAYU_API_LOGIN",
+    "PAYU_ENV",
+    "PAYU_MERCHANT_ID",
+    "RECAPTCHA_SECRET_KEY",
+    "RECAPTCHA_SITE_KEY"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": [
+    [
+     "AI_NUBE_API_KEY_CLEAR",
+     "1"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/keys/nueva",
+   "editables": [
+    "label"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/1/suspend",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/1/rotate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/2/activate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/2/rotate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/pago",
+   "editables": [
+    "fecha",
+    "metodo",
+    "monto",
+    "nota"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/plazo",
+   "editables": [
+    "dias",
+    "nueva_fecha"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "auto"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "forzar"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "silenciar"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/config",
+   "editables": [
+    "auto_suspender",
+    "dias_suspension",
+    "monto_mensual",
+    "notas",
+    "proxima_fecha"
+   ],
+   "enctype": "",
+   "envia": [
+    [
+     "auto_suspender",
+     "on"
+    ]
+   ],
+   "method": "post",
+   "opciones": [
+    [
+     "auto_suspender",
+     "on"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/zona-horaria",
+   "editables": [
+    "timezone"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/dominio",
+   "editables": [
+    "dominio_propio",
+    "subdominio"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "update"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "update"
+    ],
+    [
+     "include_public",
+     "1"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "restart"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "migrate"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "reprovision"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "sync_status"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "repair"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/admin/reset-password",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/destroy",
+   "editables": [
+    "confirm_slug",
+    "mode"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  }
+ ],
+ "sin_bd": [
+  {
+   "action": "/tenants/7/toggle",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/dian/provision",
+   "editables": [
+    "ambiente",
+    "dv",
+    "nit",
+    "prefijo",
+    "razon_social"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/dian/validate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/integraciones",
+   "editables": [
+    "AI_API_KEY",
+    "AI_BASE_URL",
+    "AI_MODEL",
+    "AI_NUBE_API_KEY",
+    "AI_NUBE_API_KEY_CLEAR",
+    "AI_NUBE_ESPERA_LOCAL_S",
+    "AI_NUBE_FALLOS_LOCAL_MIN",
+    "AI_NUBE_MAX_TOKENS",
+    "AI_NUBE_MODEL",
+    "AI_NUBE_PARA_PUBLICO",
+    "AI_NUBE_PRESUPUESTO_USD",
+    "AI_NUBE_TIMEOUT",
+    "BILLING_EMAIL",
+    "BILLING_ID",
+    "BILLING_NOMBRE",
+    "BILLING_TELEFONO",
+    "BILLING_TEXTO_PAGO",
+    "DIAN_API_KEY",
+    "DIAN_MASTER_KEY",
+    "DIAN_SERVICE_URL",
+    "DIAN_UI_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_LOGIN_REDIRECT_URI",
+    "GOOGLE_REDIRECT_URI",
+    "MAIL_DEFAULT_SENDER",
+    "MAIL_PASSWORD",
+    "MAIL_PORT",
+    "MAIL_SERVER",
+    "MAIL_USERNAME",
+    "META_CAPI_ACCESS_TOKEN",
+    "META_CAPI_TEST_EVENT_CODE",
+    "META_PIXEL_ID",
+    "PAYU_ACCOUNT_ID",
+    "PAYU_API_KEY",
+    "PAYU_API_LOGIN",
+    "PAYU_ENV",
+    "PAYU_MERCHANT_ID",
+    "RECAPTCHA_SECRET_KEY",
+    "RECAPTCHA_SITE_KEY"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": [
+    [
+     "AI_NUBE_API_KEY_CLEAR",
+     "1"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/keys/nueva",
+   "editables": [
+    "label"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/1/suspend",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/1/rotate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/2/activate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/keys/2/rotate",
+   "editables": [],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/pago",
+   "editables": [
+    "fecha",
+    "metodo",
+    "monto",
+    "nota"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/plazo",
+   "editables": [
+    "dias",
+    "nueva_fecha"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "auto"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "forzar"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/aviso-modo",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "modo",
+     "silenciar"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/billing/config",
+   "editables": [
+    "auto_suspender",
+    "dias_suspension",
+    "monto_mensual",
+    "notas",
+    "proxima_fecha"
+   ],
+   "enctype": "",
+   "envia": [
+    [
+     "auto_suspender",
+     "on"
+    ]
+   ],
+   "method": "post",
+   "opciones": [
+    [
+     "auto_suspender",
+     "on"
+    ]
+   ]
+  },
+  {
+   "action": "/tenants/7/zona-horaria",
+   "editables": [
+    "timezone"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/dominio",
+   "editables": [
+    "dominio_propio",
+    "subdominio"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "update"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "update"
+    ],
+    [
+     "include_public",
+     "1"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "restart"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "migrate"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "reprovision"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "sync_status"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/instancia",
+   "editables": [],
+   "enctype": "",
+   "envia": [
+    [
+     "accion",
+     "repair"
+    ]
+   ],
+   "method": "post",
+   "opciones": []
+  },
+  {
+   "action": "/tenants/7/destroy",
+   "editables": [
+    "confirm_slug",
+    "mode"
+   ],
+   "enctype": "",
+   "envia": [],
+   "method": "post",
+   "opciones": []
+  }
+ ]
+}

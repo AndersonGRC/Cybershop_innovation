@@ -17,11 +17,12 @@
             <li><a href="{{ url_for('dashboard.index') }}" class="brand"><img src="{{ url_for('static', filename='logo.png') }}" alt="CyberShop" class="brand-logo"><strong>CyberShop Master</strong></a></li>
         </ul>
         <ul>
-            <li><a href="{{ url_for('dashboard.index') }}">Panel</a></li>
-            <li><a href="{{ url_for('tenants.lista') }}">Clientes</a></li>
-            <li><a href="{{ url_for('pruebas.lista') }}">Pruebas</a></li>
-            <li><a href="{{ url_for('dashboard.salud') }}">Salud</a></li>
-            <li><a href="{{ url_for('dashboard.auditoria') }}">Auditoría</a></li>
+            {% set _ep = request.endpoint or '' %}
+            {% for ep, bp, texto in [('dashboard.index', 'dashboard.index', 'Panel'), ('tenants.lista', 'tenants.', 'Clientes'),
+                                     ('pruebas.lista', 'pruebas.', 'Pruebas gratis'), ('dashboard.salud', 'dashboard.salud', 'Salud'),
+                                     ('dashboard.auditoria', 'dashboard.auditoria', 'Auditoría')] %}
+            <li><a href="{{ url_for(ep) }}" {% if _ep == bp or (bp.endswith('.') and _ep.startswith(bp)) %}aria-current="page"{% endif %}>{{ texto }}</a></li>
+            {% endfor %}
             <li>
                 <details class="dropdown">
                     <summary>{{ admin.nombre }}</summary>

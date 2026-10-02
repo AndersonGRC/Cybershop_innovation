@@ -1,0 +1,160 @@
+{#- Cobros del cliente: estado, acciones rápidas, motor, aviso, configuración e historial. -#}
+{% if billing %}
+<article class="card">
+    <h3>Estado de cobro</h3>
+    {% if billing.estado == 'sin_config' %}
+    <p><span class="badge badge-muted">Sin configurar</span> Define el monto y el próximo vencimiento en «Configuración de cobro».</p>
+    {% elif billing.estado == 'al_dia' %}
+    <p><span class="badge badge-success">Al día</span> Próximo vencimiento <strong>{{ billing.proxima_fecha }}</strong> (en {{ billing.dias }} días).</p>
+    {% else %}
+    <p><span class="badge badge-danger">En mora</span>
+       Venció el <strong>{{ billing.proxima_fecha }}</strong>, <strong>{{ billing.dias }} días</strong> de atraso.
+       {% if billing.auto_suspender %}
+         {% if billing.a_suspension and billing.a_suspension > 0 %}Se auto-suspende en <strong>{{ billing.a_suspension }}</strong> días (umbral {{ billing.umbral_suspension }} d).
+         {% else %}<strong>Ya superó el umbral de {{ billing.umbral_suspension }} d</strong>: se suspenderá en la próxima revisión.{% endif %}
+       {% else %}<em>(Auto-suspensión desactivada para este cliente.)</em>{% endif %}
+    </p>
+    {% endif %}
+    <table>
+        <tr><th scope="row">Monto mensual</th><td><strong>${{ '{:,.0f}'.format(billing.monto_mensual) }}</strong></td></tr>
+        <tr><th scope="row">Próximo vencimiento</th><td>{{ billing.proxima_fecha or '—' }}</td></tr>
+        <tr><th scope="row">Auto-suspensión por mora</th><td>{{ 'Sí (a los %d días)'|format(billing.umbral_suspension) if billing.auto_suspender else 'No — excluido' }}</td></tr>
+        {% if billing.ultimo_pago %}<tr><th scope="row">Último pago</th><td>${{ '{:,.0f}'.format(billing.ultimo_pago.monto) }} el {{ billing.ultimo_pago.fecha }} ({{ billing.ultimo_pago.metodo or '—' }})</td></tr>{% endif %}
+    </table>
+</article>
+
+<div class="grid-2">
+    <article class="card">
+        <h3>Registrar pago</h3>
+        <form method="post" action="{{ url_for('tenants.billing_pago', tenant_id=tenant.id) }}">
+            <label>Monto <input type="text" name="monto" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}" required inputmode="numeric"></label>
+            <label>Fecha del pago <input type="date" name="fecha"></label>
+            <label>Método
+                <select name="metodo">
+                    <option value="transferencia">Transferencia</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="web/PayU">Web / PayU</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </label>
+            <label>Nota <input type="text" name="nota" placeholder="opcional"></label>
+            <button type="submit">Registrar pago (+1 mes)</button>
+            <small class="muted">Avanza el vencimiento un mes y reactiva si estaba suspendido por mora.</small>
+        </form>
+    </article>
+
+    <article class="card">
+        <h3>Dar más plazo</h3>
+        <form method="post" action="{{ url_for('tenants.billing_plazo', tenant_id=tenant.id) }}">
+            <label>Sumar días <input type="number" name="dias" min="1" placeholder="ej. 15"></label>
+            <label>…o fecha exacta <input type="date" name="nueva_fecha"></label>
+            <button type="submit" class="secondary">Extender vencimiento</button>
+            <small class="muted">Empuja el vencimiento sin registrar un pago.</small>
+        </form>
+    </article>
+</div>
+
+<article class="card">
+    <h3>Motor de cobro automático</h3>
+    {% if billing.motor %}
+    <p>
+        {% if billing.motor.es_trial %}<span class="badge badge-info">prueba gratis</span>{% endif %}
+        {% if billing.motor.suspendida_por_pago %}<span class="badge badge-danger">suspendida por no-pago</span>{% endif %}
+        El cliente recibe <strong>recordatorios automáticos por correo</strong>
+        ({{ billing.motor.buyer_email }}) y puede pagar solo con su link.
+    </p>
+    <p>
+        <strong>Contacto:</strong> {{ billing.motor.buyer_nombre or '—' }} ·
+        {% if billing.motor.buyer_telefono %}
+            WhatsApp {{ billing.motor.buyer_telefono }}
+            {% if billing.motor.whatsapp_url %}<a href="{{ billing.motor.whatsapp_url }}" target="_blank" rel="noopener">(escribirle)</a>{% endif %}
+        {% else %}<em>sin teléfono registrado</em>{% endif %}
+    </p>
+    <table>
+        <tr><th scope="row">Plan (motor)</th><td>{{ billing.motor.plan_key }}</td></tr>
+        <tr><th scope="row">Próximo cobro (motor)</th><td>{{ billing.motor.proximo_pago or '—' }}</td></tr>
+        <tr><th scope="row">Último recordatorio enviado</th><td>{{ billing.motor.ultimo_recordatorio or 'ninguno aún' }}</td></tr>
+        {% if billing.motor.link_pago %}
+        <tr><th scope="row">Link de pago (compártelo por WhatsApp)</th>
+            <td><input type="text" readonly value="{{ billing.motor.link_pago }}" class="input-copiar" onclick="this.select()" aria-label="Link de pago"></td></tr>
+        {% endif %}
+    </table>
+    <p class="muted">Si registras un pago manual aquí, el motor adopta la nueva fecha en la próxima corrida diaria.</p>
+    {% else %}
+    <p><span class="badge badge-muted">Fuera del motor</span> Este cliente no recibe recordatorios automáticos ni
+       tiene link de pago. Córrelo con <code>tools/backfill_plan_compras.py</code> en el servidor para incorporarlo.</p>
+    {% endif %}
+</article>
+
+<article class="card">
+    <h3>Aviso de vencimiento en el panel del cliente</h3>
+    <p>
+        {% if billing.aviso_modo == 'forzar' %}
+        <span class="badge badge-success">mostrar siempre</span> El cliente ve el aviso ahora, aunque el plan esté al día.
+        {% elif billing.aviso_modo == 'silenciar' %}
+        <span class="badge badge-muted">silenciado</span> El cliente <strong>no ve</strong> el aviso.
+        {% else %}
+        <span class="badge badge-success">automático</span> El cliente ve el aviso 3 días antes de vencer y cuando está vencido.
+        {% endif %}
+    </p>
+    <div class="acciones-fila">
+        {% for m, txt in [('auto','🔔 Automático'), ('forzar','📣 Mostrar siempre'), ('silenciar','🔕 Silenciar')] %}
+        <form method="post" action="{{ url_for('tenants.billing_aviso_modo', tenant_id=tenant.id) }}">
+            <input type="hidden" name="modo" value="{{ m }}">
+            <button type="submit" class="{% if billing.aviso_modo != m %}secondary outline{% endif %}"
+                    {% if billing.aviso_modo == m %}disabled{% endif %}>{{ txt }}</button>
+        </form>
+        {% endfor %}
+    </div>
+</article>
+
+<article class="card">
+    <h3>Configuración de cobro</h3>
+    <form method="post" action="{{ url_for('tenants.billing_config', tenant_id=tenant.id) }}">
+        <div class="grid-2">
+            <label>Monto mensual <input type="text" name="monto_mensual" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}" inputmode="numeric"></label>
+            <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}"></label>
+        </div>
+        <div class="grid-2">
+            <label>Días de plazo antes de suspender
+                <input type="number" name="dias_suspension" min="0" max="365"
+                       value="{{ billing.dias_suspension if billing.dias_suspension is not none else '' }}"
+                       placeholder="por defecto {{ billing.umbral_suspension }}">
+            </label>
+            <label class="check-fila">
+                <input type="checkbox" name="auto_suspender" {% if billing.auto_suspender %}checked{% endif %}>
+                Auto-suspender por mora
+            </label>
+        </div>
+        <small class="muted">Tras el vencimiento, el sistema espera <strong>estos días</strong> antes de suspender.
+            Vacío = {{ billing.umbral_suspension }} días (por defecto).</small>
+        <label>Notas <input type="text" name="notas" value="{{ billing.notas }}"></label>
+        <button type="submit">Guardar configuración</button>
+    </form>
+</article>
+
+{% if billing.historial %}
+<article class="card">
+    <h3>Historial de pagos <small class="muted">({{ billing.historial|length }})</small></h3>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col">Fecha</th><th scope="col">Monto</th><th scope="col">Método</th><th scope="col">Cubre hasta</th><th scope="col">Nota</th><th scope="col">Por</th></tr></thead>
+        <tbody>
+            {% for p in billing.historial %}
+            <tr>
+                <td>{{ p.fecha }}</td>
+                <td>${{ '{:,.0f}'.format(p.monto) }}</td>
+                <td>{{ p.metodo or '—' }}</td>
+                <td>{{ p.cubre_hasta or '—' }}</td>
+                <td>{{ p.nota or '' }}</td>
+                <td><small>{{ p.registrado_por or '' }}</small></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</article>
+{% endif %}
+{% else %}
+<article class="card"><p>No se pudo cargar la información de cobro de este cliente.</p></article>
+{% endif %}

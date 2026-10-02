@@ -1,0 +1,61 @@
+{#- Resumen del cliente: solo lectura, con los datos que la vista ya carga. -#}
+{% set avisos = [] %}
+{% if not tenant.db_name %}{% set _ = avisos.append(('danger', 'El cliente no tiene base de datos aprovisionada.', 'servidor')) %}{% endif %}
+{% if site_error %}{% set _ = avisos.append(('danger', 'No se pudo leer la base de datos del cliente.', 'servidor')) %}{% endif %}
+{% if billing and billing.en_mora %}{% set _ = avisos.append(('danger', 'En mora: venció el ' ~ billing.proxima_fecha ~ ' (' ~ billing.dias ~ ' días).', 'cobros')) %}{% endif %}
+{% if runtime and runtime.instance_status != 'running' %}{% set _ = avisos.append(('warning', 'La instancia no está activa.', 'servidor')) %}{% endif %}
+{% if health and not health.http_ok %}{% set _ = avisos.append(('warning', 'El sitio del cliente no responde.', 'servidor')) %}{% endif %}
+{% if ('pos' in mods_activos or 'orders' in mods_activos) and not ns_env.payu %}{% set _ = avisos.append(('warning', 'Ventas activas sin PayU: la tienda solo vende por WhatsApp.', 'integraciones')) %}{% endif %}
+{% if 'facturacion_electronica' in mods_activos and dian and not dian.env_ok %}{% set _ = avisos.append(('warning', 'Facturación DIAN activa sin credenciales: no puede emitir facturas.', 'integraciones')) %}{% endif %}
+{% if ('ai_assistant' in mods_activos or 'ai_public' in mods_activos) and not ns_env.ai_model %}{% set _ = avisos.append(('warning', 'IA activa sin modelo elegido.', 'ia')) %}{% endif %}
+
+<div class="resumen-grid">
+    <article class="card resumen-card">
+        <h3>Sitio</h3>
+        {% if _pub %}<p><a href="{{ _pub }}" target="_blank" rel="noopener">{{ _pub | replace('https://', '') }} ↗</a></p>{% else %}<p class="muted">Sin dominio publicado</p>{% endif %}
+        <p class="muted">Plantilla {{ plantilla_actual }}</p>
+        <a href="#sitio" data-ir="sitio">Editar sitio público →</a>
+    </article>
+
+    <article class="card resumen-card">
+        <h3>Cobro</h3>
+        {% if not billing %}<p class="muted">Sin información de cobro.</p>
+        {% elif billing.estado == 'sin_config' %}<p><span class="badge badge-muted">Sin configurar</span></p>
+        {% elif billing.estado == 'al_dia' %}<p><span class="badge badge-success">Al día</span> vence {{ billing.proxima_fecha }}</p>
+        {% else %}<p><span class="badge badge-danger">En mora</span> {{ billing.dias }} días</p>{% endif %}
+        {% if billing and billing.monto_mensual %}<p class="muted">${{ '{:,.0f}'.format(billing.monto_mensual) }} / mes</p>{% endif %}
+        <a href="#cobros" data-ir="cobros">Ver cobros →</a>
+    </article>
+
+    <article class="card resumen-card">
+        <h3>Módulos</h3>
+        {% if mods %}
+        <p><strong>{{ mods_activos | length }}</strong> de {{ mods | length }} activos</p>
+        <p class="muted">IA: {{ (mods | selectattr('categoria', 'equalto', 'inteligencia') | selectattr('is_active') | map(attribute='nombre') | join(', ')) or 'apagada' }}</p>
+        {% else %}<p class="muted">No disponibles</p>{% endif %}
+        <a href="#modulos" data-ir="modulos">Ver módulos →</a>
+    </article>
+
+    <article class="card resumen-card">
+        <h3>Servidor</h3>
+        {% if health %}
+        <p>{% if health.service_active %}<span class="badge badge-success">proceso activo</span>{% else %}<span class="badge badge-warning">proceso detenido</span>{% endif %}
+           {% if health.http_ok %}<span class="badge badge-success">responde</span>{% else %}<span class="badge badge-warning">no responde</span>{% endif %}</p>
+        {% else %}<p class="muted">Estado no disponible</p>{% endif %}
+        <p class="muted">Zona horaria {{ tz_actual }}</p>
+        <a href="#servidor" data-ir="servidor">Ver servidor →</a>
+    </article>
+</div>
+
+<article class="card">
+    <h3>Pendientes</h3>
+    {% if avisos %}
+    <ul class="avisos">
+        {% for nivel, texto, destino in avisos %}
+        <li class="aviso aviso-{{ nivel }}"><span>{{ texto }}</span> <a href="#{{ destino }}" data-ir="{{ destino }}">Resolver →</a></li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p><span class="badge badge-success">Todo en orden</span> No hay pendientes para este cliente.</p>
+    {% endif %}
+</article>

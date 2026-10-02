@@ -3,14 +3,14 @@
 
 {% block content %}
 <hgroup>
-    <h1>Crear tenant nuevo</h1>
+    <h1>Nuevo cliente</h1>
     <p>Esto provisiona un cliente nuevo end-to-end: crea su base de datos, aplica el schema base, registra en el control plane y emite la primera API key.</p>
 </hgroup>
 
 <article>
     <form method="post">
         <label for="slug">
-            Slug del tenant
+            Identificador del cliente (slug)
             <input type="text" id="slug" name="slug" required
                    value="{{ form.slug }}"
                    pattern="[a-z0-9]+(-[a-z0-9]+)*"
@@ -111,7 +111,7 @@
 
         <div class="grid">
             <a role="button" class="secondary" href="{{ url_for('tenants.lista') }}">Cancelar</a>
-            <button type="submit">Crear tenant</button>
+            <button type="submit">Crear cliente</button>
         </div>
     </form>
 </article>

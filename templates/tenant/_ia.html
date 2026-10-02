@@ -1,0 +1,140 @@
+{#- Inteligencia artificial: todo lo de IA del cliente en un solo lugar.
+    - Módulos: mismo guardado que «Módulos y plan»; los demás módulos activos
+      viajan ocultos porque guardar reemplaza la lista COMPLETA.
+    - Servidor/modelo y respaldo: misma ruta de integraciones; ese guardado
+      solo toca las claves que recibe. -#}
+{% set es_ia = ['Asistente IA (Ollama / OpenAI-compatible)', 'Respaldo de emergencia Anthropic'] %}
+{% set ns_ia = namespace(respaldo=false, presupuesto='0') %}
+{% for grp in integraciones if grp.group == 'Respaldo de emergencia Anthropic' %}{% for f in grp.fields %}
+    {% if f.key == 'AI_NUBE_API_KEY' %}{% set ns_ia.respaldo = f.has_value %}{% endif %}
+    {% if f.key == 'AI_NUBE_PRESUPUESTO_USD' %}{% set ns_ia.presupuesto = f.value %}{% endif %}
+{% endfor %}{% endfor %}
+
+<article class="card ia-estado">
+    <h3>Estado</h3>
+    <ul class="estado-lista">
+        {% if mods %}
+        {% for m in mods if m.categoria == 'inteligencia' %}
+        <li><span class="badge {{ 'badge-success' if m.is_active else 'badge-muted' }}">{{ 'activo' if m.is_active else 'apagado' }}</span> {{ m.nombre }}</li>
+        {% endfor %}
+        {% endif %}
+        <li><span class="badge {{ 'badge-success' if ns_env.ai_model else 'badge-warning' }}">{{ 'modelo' if ns_env.ai_model else 'sin modelo' }}</span> {{ ns_env.ai_model or 'Elige el modelo abajo' }}</li>
+        <li><span class="badge {{ 'badge-success' if ns_ia.respaldo and (ns_ia.presupuesto | float(0)) > 0 else 'badge-muted' }}">respaldo</span>
+            Anthropic {{ 'activo (hasta ' ~ ns_ia.presupuesto ~ ' USD/mes)' if ns_ia.respaldo and (ns_ia.presupuesto | float(0)) > 0 else 'apagado' }}</li>
+    </ul>
+</article>
+
+{% if mods %}
+<form method="post" action="{{ url_for('tenants.modulos_save', tenant_id=tenant.id) }}">
+    <article class="card">
+        <h3>Funciones de IA</h3>
+        <p class="muted">«Acciones operativas con IA» viene apagado incluso en el plan Ultra. Actívalo por cliente solo después de aplicar la migración de su base de datos y revisar los permisos de inventario y CRM.</p>
+        {% for m in mods if m.categoria != 'inteligencia' and m.is_active %}
+        <input type="hidden" name="modulo" value="{{ m.code }}">
+        {% endfor %}
+        <div class="toggle-grid">
+            {% for m in mods if m.categoria == 'inteligencia' %}
+            <label class="toggle-item">
+                <input type="checkbox" name="modulo" value="{{ m.code }}" role="switch" {% if m.is_active %}checked{% endif %}>
+                <span>{{ m.nombre }}<br><small class="muted">{{ m.descripcion }}</small></span>
+            </label>
+            {% endfor %}
+        </div>
+        <div class="acciones-fila"><button type="submit">Guardar funciones de IA</button></div>
+    </article>
+</form>
+{% endif %}
+
+<form method="post" action="{{ url_for('tenants.integraciones_save', tenant_id=tenant.id) }}">
+    {% for grp in integraciones if grp.group in es_ia %}
+    {% set avanzado = grp.group == 'Respaldo de emergencia Anthropic' %}
+    <details class="card int-group" {% if not avanzado %}open{% endif %}>
+        <summary>{{ 'Servidor y modelo de IA' if not avanzado else 'Avanzado · respaldo de emergencia con Anthropic' }}</summary>
+        {% if avanzado %}
+        <p class="muted">Se configura por cliente. Queda apagado con presupuesto 0 USD o sin API Key. El contador local es
+        estimado y no es un límite bancario: establece también un límite de gasto en Anthropic antes de activarlo. La API
+        Key debe estar creada dentro de un workspace de Anthropic. Los cambios se aplican al reiniciar la instancia
+        (Servidor → Acciones avanzadas → Reiniciar).</p>
+        {% else %}
+        <p class="muted">El servidor de IA es el mismo equipo para todos los clientes; normalmente solo hay que elegir el modelo.</p>
+        {% endif %}
+        <div class="grid-2">
+            {% for f in grp.fields %}
+            {% include 'tenant/_campo_integracion.html' %}
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+    <div class="acciones-fila"><button type="submit">Guardar configuración de IA</button></div>
+</form>
+
+<article class="card">
+    <h3>Últimas acciones operativas con IA</h3>
+    <p class="muted">Solo decisiones de este cliente. El detalle y los borradores permanecen en su propia base de datos.</p>
+    {% if acciones_ia is none %}
+    <p class="muted">Historial no disponible: aplica la migración 0015 en la base de este cliente.</p>
+    {% elif not acciones_ia %}
+    <p class="muted">Aún no hay acciones confirmadas o canceladas.</p>
+    {% else %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Fecha</th><th scope="col">Usuario</th><th scope="col">Acción</th><th scope="col">Estado</th><th scope="col">Resumen</th></tr></thead>
+            <tbody>
+            {% for a in acciones_ia %}
+            <tr>
+                <td>{{ a.decidido_en or a.creado_en }}</td>
+                <td>#{{ a.usuario_id }}</td>
+                <td>{{ a.tipo|replace('_', ' ') }}</td>
+                <td>{{ a.estado }}</td>
+                <td>{{ a.resumen }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</article>
+
+<script>
+(function () {
+    var btn = document.getElementById('ai-refresh-btn');
+    if (!btn) return;
+    var status = document.getElementById('ai-model-status');
+    var select = document.getElementById('ai-model-select');
+    var baseInput = document.querySelector('#tab-ia [name="AI_BASE_URL"]');
+    var loaded = false;
+    function refresh() {
+        var base = (baseInput && baseInput.value || '').trim();
+        status.textContent = ' consultando modelos…';
+        btn.disabled = true;
+        fetch(btn.dataset.url + '?base_url=' + encodeURIComponent(base))
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (j.models && j.models.length) {
+                    // La lista nueva conserva el modelo elegido aunque ya no esté
+                    // en el servidor, para no cambiarlo sin que el operador lo note.
+                    var actual = select.value;
+                    var modelos = j.models.slice();
+                    if (actual && modelos.indexOf(actual) < 0) { modelos.unshift(actual); }
+                    select.innerHTML = '';
+                    modelos.forEach(function (m) {
+                        var opt = document.createElement('option');
+                        opt.value = m; opt.textContent = m;
+                        if (m === actual) { opt.selected = true; }
+                        select.appendChild(opt);
+                    });
+                    status.textContent = ' ' + j.models.length + ' modelos disponibles ✓';
+                } else {
+                    status.textContent = ' Tu PC de IA está apagada o inalcanzable: se conserva la última lista conocida.';
+                }
+            })
+            .catch(function () { status.textContent = ' No se pudo consultar: se conserva la última lista conocida.'; })
+            .finally(function () { btn.disabled = false; });
+    }
+    btn.addEventListener('click', refresh);
+    // La lista se consulta sola la primera vez que se abre la pestaña IA.
+    document.addEventListener('cs:tab', function (ev) {
+        if (ev.detail === 'ia' && !loaded) { loaded = true; refresh(); }
+    });
+})();
+</script>

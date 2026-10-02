@@ -1,0 +1,160 @@
+{#- Sitio público (antes del login): plantilla, logo, datos, colores y secciones. -#}
+{% if cfg %}
+{% set _logo = cfg['values'].get('empresa_logo_url') %}
+{% set _pub_base = _pub or 'https://cybershopcol.com' %}
+
+<article class="card">
+    <h3>Plantilla del sitio</h3>
+    <p class="muted">Cambia solo el diseño: usa los mismos colores, slides y contenido. Se ve al recargar el sitio (Ctrl+F5).</p>
+    <form method="post" action="{{ url_for('tenants.plantilla_save', tenant_id=tenant.id) }}">
+        <div class="plantillas">
+            {% for p in plantillas_sitio %}
+            <label class="pl-card{{ ' is-on' if plantilla_actual == p.key }}">
+                <input type="radio" name="plantilla_sitio" value="{{ p.key }}" {{ 'checked' if plantilla_actual == p.key }}>
+                <span class="pl-icono" aria-hidden="true">{{ p.icono }}</span>
+                <strong>{{ p.label }}{% if plantilla_actual == p.key %} <span class="pl-actual">actual</span>{% endif %}</strong>
+                <small class="muted">{{ p.desc }}</small>
+            </label>
+            {% endfor %}
+        </div>
+        <div class="acciones-fila">
+            <button type="submit">Aplicar plantilla</button>
+            <a href="{{ _pub_base }}" target="_blank" rel="noopener" role="button" class="secondary outline">Ver el sitio ↗</a>
+        </div>
+    </form>
+</article>
+
+<article class="card">
+    <h3>Logo</h3>
+    <p class="muted">Se muestra en el encabezado y el pie del sitio público.</p>
+    <div class="logo-fila">
+        <div class="logo-actual">
+            <small class="muted">Logo actual</small>
+            {% if _logo %}
+            <img src="{{ _pub_base }}{{ _logo }}" alt="Logo actual del cliente"
+                 onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+            <small class="muted" hidden>(no se pudo previsualizar)</small>
+            {% else %}
+            <small class="muted">Sin logo (se usa el genérico)</small>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ url_for('tenants.logo_upload', tenant_id=tenant.id) }}" enctype="multipart/form-data" class="logo-form">
+            <label>Cambiar logo
+                <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg,.gif" required>
+            </label>
+            <button type="submit" class="btn-small">Subir logo</button>
+            <small class="muted">PNG, JPG, WEBP, SVG o GIF.</small>
+        </form>
+    </div>
+</article>
+
+{% macro color_field(f) %}
+    <div class="color-field" title="{{ f.description }}">
+        <span class="color-label">{{ f.label }}</span>
+        <span class="color-row">
+            <input type="color" name="{{ f.key }}" value="{{ cfg['values'].get(f.key) or f.default or '#122C94' }}" aria-label="{{ f.label }}">
+            <input type="text" class="color-hex" value="{{ cfg['values'].get(f.key, '') }}"
+                   oninput="this.previousElementSibling.value=this.value" placeholder="{{ f.default }}" aria-label="{{ f.label }} (hexadecimal)">
+        </span>
+    </div>
+{% endmacro %}
+
+<form method="post" action="{{ url_for('tenants.config_save', tenant_id=tenant.id) }}" novalidate>
+    {% for gkey, gtitle in site_groups %}
+    <article class="card">
+        <h3>{{ gtitle }}</h3>
+        {% if gkey == 'colores' %}
+        <p class="muted">Las mismas variables que usa el sitio en vivo. El cliente también puede ajustarlas desde su panel.</p>
+
+        {% set antes_subgroups = [
+            ('estructura', 'Barra superior y fondos', 'La barra de arriba, el degradado del encabezado y el fondo de las secciones.'),
+            ('botones',    'Botones', 'Los botones en los que se puede hacer clic.'),
+            ('acentos',    'Detalles que resaltan', 'Etiquetas e insignias («Nuevo», «-20 %»), precios tachados e iconos.'),
+            ('catalogo',   'Productos y precios', 'Precios de las tarjetas, etiquetas de categoría y botones de compra.'),
+            ('carrito',    'Carrito de compras', 'El encabezado del carrito y sus botones.'),
+            ('alertas',    'Mensajes y avisos', 'Los cuadros de confirmación y de error.'),
+            ('descarga',   'Página de descarga', 'La sección de software y la descarga de la app.')
+        ] %}
+        {% set known_ui_groups = ['estructura', 'botones', 'acentos', 'catalogo', 'carrito', 'alertas', 'descarga'] %}
+
+        <h4 class="color-section-title">Antes del login · sitio público</h4>
+        {% for gk, glabel, ghelp in antes_subgroups %}
+            {% set ns = namespace(has=false) %}
+            {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and f.ui_group == gk %}{% set ns.has = true %}{% endfor %}
+            {% if ns.has %}
+            <details class="color-grupo">
+                <summary>{{ glabel }} <small class="muted">· {{ ghelp }}</small></summary>
+                <div class="color-grid">
+                    {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and f.ui_group == gk %}
+                    {{ color_field(f) }}
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        {% endfor %}
+
+        {% set nso = namespace(has=false) %}
+        {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and (f.ui_group is not defined or f.ui_group not in known_ui_groups) %}{% set nso.has = true %}{% endfor %}
+        {% if nso.has %}
+        <details class="color-grupo">
+            <summary>Otros</summary>
+            <div class="color-grid">
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'antes' and (f.ui_group is not defined or f.ui_group not in known_ui_groups) %}
+                {{ color_field(f) }}
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+
+        <h4 class="color-section-title">Después del login · panel del negocio</h4>
+        <details class="color-grupo">
+            <summary>Encabezados, menú lateral y enlaces del panel <small class="muted">· el «Color principal» también tiñe botones del sitio público</small></summary>
+            <div class="color-grid">
+                {% for f in site_fields if f.group == 'colores' and (f.phase | default('antes')) == 'despues' %}
+                {{ color_field(f) }}
+                {% endfor %}
+            </div>
+        </details>
+        {% else %}
+        <div class="grid-2">
+            {% for f in site_fields if f.group == gkey %}
+            <label title="{{ f.description }}">{{ f.label }}
+                {% if f.type == 'textarea' %}
+                <textarea name="{{ f.key }}" rows="3">{{ cfg['values'].get(f.key, '') }}</textarea>
+                {% else %}
+                <input type="{{ 'url' if f.type == 'url' else ('email' if f.type == 'email' else 'text') }}"
+                       name="{{ f.key }}"
+                       value="{{ '' if cfg['values'].get(f.key, '') == '#' else cfg['values'].get(f.key, '') }}"
+                       placeholder="{{ 'https://… (opcional)' if f.default == '#' else (f.default or '') }}">
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+    {% endfor %}
+    <div class="barra-guardar">
+        <button type="submit">Guardar datos y colores del sitio</button>
+    </div>
+</form>
+{% else %}
+<p><em>El cliente no tiene BD accesible para configurar.</em></p>
+{% endif %}
+
+{% if secs %}
+<form method="post" action="{{ url_for('tenants.secciones_save', tenant_id=tenant.id) }}">
+    <article class="card">
+        <h3>Secciones visibles</h3>
+        <p class="muted">Qué partes del sitio público ve el visitante.</p>
+        <div class="toggle-grid">
+            {% for key, label in section_fields %}
+            <label class="toggle-item">
+                <input type="checkbox" name="{{ key }}" role="switch" {% if secs.get(key) %}checked{% endif %}>
+                {{ label }}
+            </label>
+            {% endfor %}
+        </div>
+        <div class="acciones-fila"><button type="submit">Guardar secciones</button></div>
+    </article>
+</form>
+{% endif %}

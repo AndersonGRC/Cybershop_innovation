@@ -1,0 +1,35 @@
+{#- Un campo de integración (variable de entorno de la instancia). Recibe `f`. -#}
+<label>{{ f.label }}{% if f.secret %} <span class="muted" title="Secreto: se muestra enmascarado">🔒</span>{% endif %}
+    {% if f.type == 'select' %}
+    <select name="{{ f.key }}">
+        {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+    </select>
+    {% elif f.type == 'modelos' %}
+    <select name="{{ f.key }}" id="ai-model-select">
+        {% if not f.options %}<option value="" selected>— Enciende tu equipo de IA y pulsa «Actualizar modelos» —</option>{% endif %}
+        {% for opt in f.options %}<option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+    </select>
+    <span class="ai-model-tools">
+        <button type="button" class="secondary outline btn-small" id="ai-refresh-btn"
+                data-url="{{ url_for('tenants.ai_models', tenant_id=tenant.id) }}">🔄 Actualizar modelos</button>
+        <small class="muted" id="ai-model-status" role="status"></small>
+    </span>
+    {% elif f.secret %}
+    <input type="password" name="{{ f.key }}" value="" autocomplete="new-password"
+           placeholder="{{ f.masked if f.has_value else '(no configurado)' }}">
+    {% elif f.type == 'number' %}
+    <input type="number" name="{{ f.key }}" value="{{ f.value }}"
+           step="{{ '0.01' if f.key == 'AI_NUBE_PRESUPUESTO_USD' else '1' }}"
+           {% if f.key == 'AI_NUBE_PRESUPUESTO_USD' %}min="0" max="5"{% endif %}
+           {% if f.key == 'AI_NUBE_ESPERA_LOCAL_S' %}min="180" max="86400"{% endif %}
+           {% if f.key == 'AI_NUBE_FALLOS_LOCAL_MIN' %}min="3" max="10"{% endif %}
+           {% if f.key == 'AI_NUBE_MAX_TOKENS' %}min="1" max="220"{% endif %}
+           {% if f.key == 'AI_NUBE_TIMEOUT' %}min="5" max="60"{% endif %}>
+    {% else %}
+    <input type="text" name="{{ f.key }}" value="{{ f.value }}">
+    {% endif %}
+</label>
+{% if f.key == 'AI_NUBE_API_KEY' and f.has_value %}
+<label><input type="checkbox" name="AI_NUBE_API_KEY_CLEAR" value="1">
+    Borrar la API Key y desactivar el respaldo de este cliente</label>
+{% endif %}

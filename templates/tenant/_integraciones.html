@@ -1,0 +1,86 @@
+{#- Integraciones (sin IA, que tiene su pestaña). Todos los formularios usan la
+    misma ruta: el guardado solo toca las claves que recibe. -#}
+{% set es_ia = ['Asistente IA (Ollama / OpenAI-compatible)', 'Respaldo de emergencia Anthropic'] %}
+{% set es_dian = ['Facturación / Cuenta de cobro (DIAN)', 'Facturación Electrónica (microservicio DIAN)'] %}
+
+<p class="muted intro">Credenciales del entorno de la instancia del cliente; se aplican al reiniciarla. Los secretos se
+   muestran enmascarados: deja el campo en blanco para conservarlo o escribe uno nuevo para reemplazarlo.</p>
+
+<form method="post" action="{{ url_for('tenants.integraciones_save', tenant_id=tenant.id) }}">
+    {% for grp in integraciones if grp.group not in es_ia and grp.group not in es_dian %}
+    <details class="card int-group" {% if loop.first %}open{% endif %}>
+        <summary>{{ grp.group }}</summary>
+        <div class="grid-2">
+            {% for f in grp.fields %}
+            {% include 'tenant/_campo_integracion.html' %}
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+    <div class="acciones-fila"><button type="submit">Guardar integraciones</button></div>
+</form>
+
+<h3 class="bloque-titulo" id="dian">Facturación electrónica (DIAN)</h3>
+{% if dian %}
+<article class="card">
+    <p>
+        {% if dian.env_ok %}<span class="badge badge-success">credenciales configuradas</span>
+        {% else %}<span class="badge badge-danger">sin credenciales</span> El cliente no puede emitir facturas.{% endif %}
+        {% if not dian.master_configured %}<span class="badge badge-danger">DIAN_MASTER_KEY no configurada en el maestro</span>{% endif %}
+        {% if mods %}
+            {% set fe = mods | selectattr('code', 'equalto', 'facturacion_electronica') | list %}
+            {% if fe %}<span class="badge {{ 'badge-success' if fe[0].is_active else 'badge-muted' }}">módulo {{ 'activo' if fe[0].is_active else 'apagado' }}</span>{% endif %}
+        {% endif %}
+    </p>
+    <p class="muted">Servicio: <code>{{ dian.service_url }}</code> · Variables del cliente:
+        {% for k, presente in dian.env.items() %}
+        <span title="{{ k }}">{{ '✓' if presente else '✗' }} {{ k.replace('DIAN_', '') }}</span>{{ ' · ' if not loop.last }}
+        {% endfor %}
+    </p>
+    {% if not dian.env_ok %}
+    <form method="post" action="{{ url_for('tenants.dian_provision', tenant_id=tenant.id) }}">
+        <div class="grid-2">
+            <label>NIT (solo dígitos)
+                <input type="text" name="nit" value="{{ dian.prefill.nit }}" required inputmode="numeric">
+            </label>
+            <label>DV <span class="muted">(vacío = se calcula)</span>
+                <input type="text" name="dv" value="" placeholder="auto">
+            </label>
+            <label>Razón social
+                <input type="text" name="razon_social" value="{{ dian.prefill.razon_social }}" required>
+            </label>
+            <label>Ambiente
+                <select name="ambiente">
+                    <option value="habilitacion" selected>habilitacion (pruebas)</option>
+                    <option value="produccion">produccion</option>
+                </select>
+            </label>
+            <label>Prefijo de facturación <span class="muted">(opcional)</span>
+                <input type="text" name="prefijo" value="">
+            </label>
+        </div>
+        <button type="submit">Provisionar en servicio DIAN</button>
+        <p class="muted">Crea el cliente en FacturacionDIAN, guarda su API key en el entorno de la instancia y la reinicia.
+           Después: subir certificado .p12 y resolución desde el panel DIAN.</p>
+    </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('tenants.dian_validate', tenant_id=tenant.id) }}" class="acciones-fila">
+        <button type="submit" class="secondary">Validar cadena completa</button>
+        <small class="muted">Comprueba módulo activo, servicio vivo y API key del cliente aceptada.</small>
+    </form>
+</article>
+{% endif %}
+
+<form method="post" action="{{ url_for('tenants.integraciones_save', tenant_id=tenant.id) }}">
+    {% for grp in integraciones if grp.group in es_dian %}
+    <details class="card int-group">
+        <summary>{{ 'Datos fiscales del cliente (cuenta de cobro y DIAN)' if grp.group == es_dian[0] else 'Conexión con el microservicio DIAN' }}</summary>
+        <div class="grid-2">
+            {% for f in grp.fields %}
+            {% include 'tenant/_campo_integracion.html' %}
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+    <div class="acciones-fila"><button type="submit">Guardar datos de facturación</button></div>
+</form>

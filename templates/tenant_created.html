@@ -4,7 +4,7 @@
 {% block content %}
 <article class="success-banner">
     <hgroup>
-        <h1>✓ Tenant creado</h1>
+        <h1>✓ Cliente creado</h1>
         <p><strong>{{ info.nombre }}</strong> ({{ info.slug }})</p>
     </hgroup>
 </article>
@@ -13,7 +13,7 @@
     <h2>⚠️ Copiá estas credenciales AHORA</h2>
     <p>
         La <strong>API key</strong> no se vuelve a mostrar nunca. Si la perdés,
-        tendrás que rotar la key (con el botón en el detalle del tenant) y dar
+        tendrás que rotar la key (con el botón en la ficha del cliente) y dar
         de baja la vieja.
     </p>
 </article>
@@ -75,7 +75,7 @@
     <hr>
 
     <details>
-        <summary>Detalles técnicos del tenant</summary>
+        <summary>Detalles técnicos del cliente</summary>
         <table>
             <tr><td><strong>Tenant ID</strong></td><td>{{ info.tenant_id }}</td></tr>
             <tr><td><strong>Slug</strong></td><td><code>{{ info.slug }}</code></td></tr>
