@@ -428,3 +428,82 @@ def revisar_y_suspender(dias=None, por='cron'):
         except Exception:  # noqa: BLE001 — no abortar el lote por uno
             continue
     return suspendidos
+
+
+# ── Motor de cobro ↔ ciclo de vida del cliente ─────────────────
+# El motor (plan_compras) vive en la BD del operador (tenant 1). Al cancelar o
+# eliminar una tienda hay que cerrar su compra: si no, el cron seguía mandando
+# recordatorios con link de pago y, si la persona pagaba, se intentaba
+# reactivar una tienda que ya no existe.
+
+def _conexion_operador():
+    from db import get_tenant_conn, control_plane_cursor
+    with control_plane_cursor(dict_cursor=True) as cur:
+        cur.execute("SELECT db_name FROM tenant_databases WHERE tenant_id = 1")
+        fila = cur.fetchone()
+    if not fila:
+        return None
+    return get_tenant_conn(fila['db_name'])
+
+
+def _motor_ejecutar(sql_texto, params, devolver=False):
+    conn = _conexion_operador()
+    if conn is None:
+        return [] if devolver else 0
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('plan_compras') IS NOT NULL AS hay")
+            if not cur.fetchone()['hay']:
+                return [] if devolver else 0
+            cur.execute(sql_texto, params)
+            resultado = [dict(f) for f in cur.fetchall()] if devolver else cur.rowcount
+        conn.commit()
+        return resultado
+    finally:
+        conn.close()
+
+
+def cerrar_compra_motor(tenant_id: int, estado: str) -> int:
+    """Tienda cancelada (CANCELADA) o eliminada (ELIMINADA): su compra deja de
+    cobrarse. Devuelve cuántas filas cerró. Nunca borra la compra (historial)."""
+    if estado not in ('CANCELADA', 'ELIMINADA'):
+        raise ValueError('Estado de cierre inválido')
+    return _motor_ejecutar(
+        "UPDATE plan_compras SET estado = %s "
+        "WHERE tenant_id = %s AND renovacion_de IS NULL AND estado IN ('ACTIVADA', 'CANCELADA')",
+        (estado, tenant_id))
+
+
+def reabrir_compra_motor(tenant_id: int) -> int:
+    """Una tienda cancelada (soft) que se reactiva vuelve al ciclo de cobro."""
+    return _motor_ejecutar(
+        "UPDATE plan_compras SET estado = 'ACTIVADA' "
+        "WHERE tenant_id = %s AND renovacion_de IS NULL AND estado = 'CANCELADA'",
+        (tenant_id,))
+
+
+def pruebas_por_limpiar(dias_gracia: int = 7) -> list:
+    """Pruebas gratis que NO pagaron y vencieron hace más de `dias_gracia` días
+    (o ya están canceladas): candidatas a eliminar para liberar el servidor.
+    Una prueba que pagó deja de ser es_trial y nunca aparece aquí."""
+    return _motor_ejecutar(
+        """SELECT tenant_id, nombre_negocio, buyer_nombre, buyer_email, buyer_telefono,
+                  dominio, slug, proximo_pago, estado, suspendida_por_pago,
+                  (CURRENT_DATE - proximo_pago) AS dias_vencida
+           FROM plan_compras
+           WHERE es_trial = TRUE AND referencia_pedido LIKE 'TRIAL-%%'
+             AND renovacion_de IS NULL AND tenant_id IS NOT NULL
+             AND (estado = 'CANCELADA'
+                  OR (estado = 'ACTIVADA' AND proximo_pago < CURRENT_DATE - %s))
+           ORDER BY proximo_pago""",
+        (int(dias_gracia),), devolver=True)
+
+
+def es_prueba_sin_pagar(tenant_id: int) -> bool:
+    """¿Este cliente fue una prueba gratis que nunca pagó?"""
+    filas = _motor_ejecutar(
+        "SELECT 1 FROM plan_compras WHERE tenant_id = %s AND referencia_pedido LIKE 'TRIAL-%%' "
+        "AND es_trial = TRUE AND renovacion_de IS NULL LIMIT 1",
+        (tenant_id,), devolver=True)
+    return bool(filas)

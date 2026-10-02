@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Pruebas por limpiar · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>🧹 Pruebas por limpiar</h1>
+    <p>Tiendas de <strong>prueba gratis</strong> que vencieron hace más de {{ dias_gracia }} días <strong>sin pagar</strong>
+       (o que ya cancelaste). Ocupan una instancia, una base de datos y una dirección web en el servidor.</p>
+</hgroup>
+
+<article>
+    <p><small>
+        <strong>Qué hace «Eliminar»:</strong> saca una copia de respaldo de su base de datos, apaga la tienda, quita su
+        dirección web, borra su base de datos, su configuración y su carpeta, libera su puerto y cierra su cobro
+        (no se le vuelven a enviar recordatorios ni links de pago). El código HTML/CSS/JS es compartido por todas las
+        tiendas: no hay nada que borrar ahí. Una tienda que pagó <strong>nunca</strong> aparece en esta lista.
+    </small></p>
+</article>
+
+{% if candidatas %}
+<form method="post" action="{{ url_for('pruebas.eliminar') }}"
+      onsubmit="return confirm('Se eliminarán las tiendas marcadas (con backup). Esto no se puede deshacer. ¿Continuar?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <figure>
+    <table>
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="marcarTodas" aria-label="Marcar todas"></th>
+                <th>Negocio</th><th>Contacto</th><th>Dirección</th><th>Venció</th><th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for c in candidatas %}
+            <tr>
+                <td><input type="checkbox" name="tenant_id" value="{{ c.tenant_id }}" class="marca"></td>
+                <td><strong>{{ c.nombre_negocio or c.slug }}</strong><br><small><code>{{ c.slug }}</code></small></td>
+                <td><small>{{ c.buyer_nombre or '—' }}<br>{{ c.buyer_email }}{% if c.buyer_telefono %}<br>WhatsApp {{ c.buyer_telefono }}{% endif %}</small></td>
+                <td><small>{{ c.dominio or '—' }}</small></td>
+                <td>{% if c.proximo_pago %}{{ c.proximo_pago }}<br><small>hace {{ c.dias_vencida }} días</small>{% else %}—{% endif %}</td>
+                <td>
+                    {% if c.estado == 'CANCELADA' or c.estado_cliente == 'cancelado' %}<span class="badge badge-warning">cancelada (BD conservada)</span>
+                    {% elif c.suspendida_por_pago %}<span class="badge badge-warning">suspendida</span>
+                    {% else %}<span class="badge badge-danger">vencida, sigue encendida</span>{% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </figure>
+    <div class="grid">
+        <label>Escribe <code>ELIMINAR</code> para confirmar
+            <input type="text" name="confirmacion" required autocomplete="off" placeholder="ELIMINAR">
+        </label>
+        <div style="align-self:end">
+            <button type="submit" class="contrast">Eliminar las marcadas (máx. {{ max_por_vez }} por vez)</button>
+        </div>
+    </div>
+</form>
+<script>
+document.getElementById('marcarTodas').addEventListener('change', function () {
+    var on = this.checked;
+    document.querySelectorAll('.marca').forEach(function (c) { c.checked = on; });
+});
+</script>
+{% else %}
+<article><p>✅ No hay pruebas vencidas sin pagar por limpiar.</p></article>
+{% endif %}
+
+<article>
+    <h3>Copias de respaldo de pruebas eliminadas</h3>
+    <p><small>Al eliminar se guarda una copia por si la persona vuelve. Las de pruebas que nunca pagaron se borran a los
+        {{ retencion }} días (las de clientes que pagaron no se tocan).</small></p>
+    {% if backups %}
+    <p>Hay <strong>{{ backups|length }}</strong> copia(s) con más de {{ retencion }} días ({{ backups_mb }} MB).</p>
+    <form method="post" action="{{ url_for('pruebas.purgar_backups') }}"
+          onsubmit="return confirm('Borrar {{ backups|length }} copia(s) de pruebas eliminadas hace más de {{ retencion }} días?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="secondary">Borrar esas copias ahora</button>
+    </form>
+    {% else %}
+    <p><small>No hay copias de más de {{ retencion }} días por borrar.</small></p>
+    {% endif %}
+</article>
+{% endblock %}
