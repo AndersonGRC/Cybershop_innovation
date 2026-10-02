@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Inteligencia artificial · CyberShop Admin{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Inteligencia artificial</h1>
+    <p class="muted">Qué clientes usan IA, con qué modelo y si el servidor de IA responde. Solo lectura: para cambiar algo, abre la pestaña IA del cliente.</p>
+</hgroup>
+
+{% if error %}<article class="flash flash-error">No se pudo cargar la información de IA: {{ error }}</article>{% endif %}
+
+{% if resumen %}
+<section class="stats-grid" aria-label="Resumen de IA">
+    <article class="stat-card"><small>Clientes con IA</small><h2>{{ resumen.con_ia }}</h2><small class="muted">de {{ clientes|length }}</small></article>
+    <article class="stat-card"><small>IA sin modelo</small><h2>{{ resumen.sin_modelo }}</h2></article>
+    <article class="stat-card"><small>Con respaldo Anthropic</small><h2>{{ resumen.con_respaldo }}</h2><small class="muted">hasta {{ '%.2f'|format(resumen.respaldo_usd) }} USD/mes</small></article>
+</section>
+{% endif %}
+
+<article class="card">
+    <h3>Servidores de IA</h3>
+    {% if servidores %}
+    <ul class="estado-lista">
+        {% for s in servidores %}
+        <li>
+            {% if s.responde %}<span class="badge badge-success">responde</span>{% else %}<span class="badge badge-warning">no responde</span>{% endif %}
+            <code>{{ s.url }}</code> · {{ s.clientes }} cliente{{ 's' if s.clientes != 1 }}
+            {% if s.modelos %}<small class="muted">· {{ s.modelos|length }} modelos instalados</small>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="muted">Si el equipo de IA está apagado, los clientes con respaldo Anthropic siguen respondiendo con la nube; los demás muestran el aviso de espera.</p>
+    {% else %}
+    <p class="muted">Ningún cliente tiene funciones de IA activas.</p>
+    {% endif %}
+</article>
+
+{% if clientes %}
+<div class="table-wrap">
+<table>
+    <caption class="sr-only">IA por cliente</caption>
+    <thead>
+        <tr>
+            <th scope="col">Cliente</th>
+            {% for code, nombre in nombres_modulos.items() %}<th scope="col">{{ nombre }} <small class="muted">({{ resumen.por_modulo.get(code, 0) if resumen else 0 }})</small></th>{% endfor %}
+            <th scope="col">Modelo</th>
+            <th scope="col">Respaldo</th>
+            <th scope="col"><span class="sr-only">Abrir</span></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in clientes %}
+        <tr>
+            <th scope="row">
+                <a href="{{ url_for('tenants.detail', tenant_id=c.id) }}#ia"><strong>{{ c.nombre }}</strong></a><br>
+                <small class="muted"><code>{{ c.slug }}</code>{% if c.estado != 'activo' %} · {{ c.estado }}{% endif %}</small>
+                {% if c.error %}<br><small class="texto-error">{{ c.error }}</small>{% endif %}
+            </th>
+            {% for code in nombres_modulos %}
+            <td>{% if c.modulos.get(code) %}<span class="badge badge-success">sí</span>{% elif c.error %}<span class="muted">—</span>{% else %}<span class="muted">no</span>{% endif %}</td>
+            {% endfor %}
+            <td>
+                {% if c.modelo %}<code>{{ c.modelo }}</code>
+                    {% if c.modelo_instalado is defined and not c.modelo_instalado %}<br><span class="badge badge-warning">no instalado en el servidor</span>{% endif %}
+                {% elif c.alguna_ia %}<span class="badge badge-warning">sin modelo</span>
+                {% else %}<span class="muted">—</span>{% endif %}
+            </td>
+            <td>
+                {% if c.respaldo %}<span class="badge badge-success">{{ '%.2f'|format(c.respaldo_usd) }} USD</span>
+                    {% if c.respaldo_publico %}<br><small class="muted">también en chat público</small>{% endif %}
+                {% else %}<span class="muted">apagado</span>{% endif %}
+            </td>
+            <td><a href="{{ url_for('tenants.detail', tenant_id=c.id) }}#ia" role="button" class="secondary outline btn-small">Abrir</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<p><em>No hay clientes activos.</em></p>
+{% endif %}
+{% endblock %}

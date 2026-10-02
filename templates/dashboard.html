@@ -2,10 +2,47 @@
 {% block title %}Panel · CyberShop Admin{% endblock %}
 
 {% block content %}
+{% macro pesos(v) -%}${{ '{:,.0f}'.format(v or 0).replace(',', '.') }}{%- endmacro %}
 <hgroup>
     <h1>Panel</h1>
     <p>Vista general del SaaS.</p>
 </hgroup>
+
+{% if cobros %}
+{% set r = cobros.resumen %}
+<section class="stats-grid" aria-label="Cobros">
+    <article class="stat-card"><small>Ingreso mensual</small><h2>{{ pesos(r.ingreso_mensual) }}</h2><small class="muted">clientes activos que pagan</small></article>
+    <article class="stat-card"><small>En mora</small><h2>{{ r.en_mora }}</h2><small class="muted">{{ pesos(r.cartera_vencida) }} al mes</small></article>
+    <article class="stat-card"><small>Vencen en {{ cobros.dias_por_vencer }} días</small><h2>{{ r.por_vencer }}</h2></article>
+    <article class="stat-card"><small>Pruebas gratis</small><h2>{{ r.pruebas }}</h2><small class="muted"><a href="{{ url_for('pruebas.lista') }}">pruebas por limpiar</a></small></article>
+</section>
+
+{% set atencion = cobros.clientes | selectattr('estado_cobro', 'in', ['en_mora', 'por_vencer']) | list %}
+<section class="card">
+    <div class="card-head">
+        <h2 class="h-seccion">Requieren atención</h2>
+        <a href="{{ url_for('flota.cobros') }}">Ver todos los cobros →</a>
+    </div>
+    {% if atencion %}
+    <ul class="avisos">
+        {% for c in atencion[:8] %}
+        <li class="aviso {{ 'aviso-danger' if c.estado_cobro == 'en_mora' else 'aviso-warning' }}">
+            <span><strong>{{ c.nombre }}</strong> ·
+                {% if c.estado_cobro == 'en_mora' %}en mora hace {{ c.dias }} días{% else %}vence en {{ c.dias }} días ({{ c.proxima_fecha }}){% endif %}
+                {% if c.es_prueba %}· prueba gratis{% endif %}</span>
+            <span class="acciones-fila">
+                {% if c.whatsapp_url %}<a href="{{ c.whatsapp_url }}" target="_blank" rel="noopener">WhatsApp ↗</a>{% endif %}
+                <a href="{{ url_for('tenants.detail', tenant_id=c.id) }}#cobros">Abrir →</a>
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if atencion|length > 8 %}<p class="muted">Y {{ atencion|length - 8 }} más en <a href="{{ url_for('flota.cobros') }}">Cobros</a>.</p>{% endif %}
+    {% else %}
+    <p><span class="badge badge-success">Todo al día</span> Ningún cliente en mora ni por vencer en los próximos {{ cobros.dias_por_vencer }} días.</p>
+    {% endif %}
+</section>
+{% endif %}
 
 <section class="stats-grid">
     <article class="stat-card">

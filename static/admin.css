@@ -410,3 +410,21 @@ small.muted, p.muted { font-size: .88rem; }
 form > .acciones-fila { margin-bottom: 1.2rem; }
 .toggle-item { align-items: flex-start; }
 .toggle-item input { margin-top: .25rem; flex-shrink: 0; }
+
+/* Vistas de la flota */
+.h-seccion { font-size: 1.12rem; margin: 0; color: var(--cs-primary-dark); }
+.filtros { display: flex; flex-wrap: wrap; gap: .4rem; }
+.filtro {
+    width: auto; margin: 0; padding: .35rem .9rem; border-radius: 999px; font-size: .9rem;
+    background: var(--cs-white); color: var(--cs-text-soft); border: 1px solid var(--cs-border);
+}
+.filtro.is-on { background: var(--cs-primary); color: var(--cs-white); border-color: var(--cs-primary); }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.texto-error { color: var(--cs-danger-text); }
+
+/* Los textos .sr-only (absolutos) quedan dentro de la tabla desplazable y no
+   ensanchan la página en celular. */
+.table-wrap { position: relative; }
+
+td .badge, th .badge { white-space: nowrap; }
+.card-head { margin-bottom: .6rem; }

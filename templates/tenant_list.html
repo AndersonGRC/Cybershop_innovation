@@ -30,6 +30,7 @@
             <th scope="col">Cliente</th>
             <th scope="col">Plan</th>
             <th scope="col">Estado</th>
+            <th scope="col">Cobro</th>
             <th scope="col">Escritorio</th>
             <th scope="col">Alta</th>
             <th scope="col"><span class="sr-only">Abrir</span></th>
@@ -51,6 +52,16 @@
                 {% else %}
                     <span class="badge badge-danger">{{ t.estado }}</span>
                 {% endif %}
+            </td>
+            <td>
+                {% set cb = cobro.get(t.id) if cobro else none %}
+                {% if not cb %}<span class="muted">—</span>
+                {% elif cb.estado_cobro == 'en_mora' %}<span class="badge badge-danger">mora {{ cb.dias }} d</span>
+                {% elif cb.estado_cobro == 'por_vencer' %}<span class="badge badge-warning">vence en {{ cb.dias }} d</span>
+                {% elif cb.estado_cobro == 'al_dia' %}<span class="badge badge-success">al día</span>
+                {% else %}<span class="badge badge-muted">sin configurar</span>{% endif %}
+                {% if cb and cb.es_prueba %}<span class="badge badge-info">prueba</span>{% endif %}
+                {% if cb and cb.proxima_fecha %}<br><small class="muted">{{ cb.proxima_fecha }}</small>{% endif %}
             </td>
             <td>
                 {{ t.active_keys }} <small class="muted">/ {{ t.total_keys }} keys</small><br>

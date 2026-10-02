@@ -37,7 +37,9 @@ PLANTILLAS_SITIO = [
 def lista():
     search = request.args.get('q', '').strip()
     tenants = tenant_service.list_tenants(search=search)
-    return render_template('tenant_list.html', tenants=tenants, search=search)
+    import fleet_service
+    cobro = fleet_service.cobro_por_cliente()
+    return render_template('tenant_list.html', tenants=tenants, search=search, cobro=cobro)
 
 
 # ── Crear ────────────────────────────────────────────────────────

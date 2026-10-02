@@ -13,7 +13,13 @@ bp = Blueprint('dashboard', __name__)
 @login_required
 def index():
     stats = tenant_service.dashboard_stats()
-    return render_template('dashboard.html', stats=stats)
+    # Indicadores de cobro (solo lectura); el panel carga aunque fallen.
+    try:
+        import fleet_service
+        cobros = fleet_service.cobros_flota()
+    except Exception:  # noqa: BLE001
+        cobros = None
+    return render_template('dashboard.html', stats=stats, cobros=cobros)
 
 
 @bp.route('/salud')

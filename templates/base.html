@@ -19,6 +19,7 @@
         <ul>
             {% set _ep = request.endpoint or '' %}
             {% for ep, bp, texto in [('dashboard.index', 'dashboard.index', 'Panel'), ('tenants.lista', 'tenants.', 'Clientes'),
+                                     ('flota.cobros', 'flota.cobros', 'Cobros'), ('flota.ia', 'flota.ia', 'IA'),
                                      ('pruebas.lista', 'pruebas.', 'Pruebas gratis'), ('dashboard.salud', 'dashboard.salud', 'Salud'),
                                      ('dashboard.auditoria', 'dashboard.auditoria', 'Auditoría')] %}
             <li><a href="{{ url_for(ep) }}" {% if _ep == bp or (bp.endswith('.') and _ep.startswith(bp)) %}aria-current="page"{% endif %}>{{ texto }}</a></li>

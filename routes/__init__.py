@@ -6,6 +6,7 @@ from routes.tenant_routes import bp as tenant_bp
 from routes.internal_api import bp as internal_bp
 from routes.ip_routes import bp as ip_bp
 from routes.pruebas_routes import bp as pruebas_bp
+from routes.flota_routes import bp as flota_bp
 
 
 def register_blueprints(app):
@@ -15,3 +16,4 @@ def register_blueprints(app):
     app.register_blueprint(internal_bp)
     app.register_blueprint(ip_bp)
     app.register_blueprint(pruebas_bp)
+    app.register_blueprint(flota_bp)
