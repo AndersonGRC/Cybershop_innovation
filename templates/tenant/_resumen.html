@@ -23,7 +23,7 @@
         {% elif billing.estado == 'sin_config' %}<p><span class="badge badge-muted">Sin configurar</span></p>
         {% elif billing.estado == 'al_dia' %}<p><span class="badge badge-success">Al día</span> vence {{ billing.proxima_fecha }}</p>
         {% else %}<p><span class="badge badge-danger">En mora</span> {{ billing.dias }} días</p>{% endif %}
-        {% if billing and billing.monto_mensual %}<p class="muted">${{ '{:,.0f}'.format(billing.monto_mensual) }} / mes</p>{% endif %}
+        {% if billing and billing.monto_mensual %}<p class="muted">${{ '{:,.0f}'.format(billing.monto_mensual).replace(',', '.') }} / mes</p>{% endif %}
         <a href="#cobros" data-ir="cobros">Ver cobros →</a>
     </article>
 

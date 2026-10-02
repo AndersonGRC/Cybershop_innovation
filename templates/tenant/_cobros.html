@@ -16,10 +16,10 @@
     </p>
     {% endif %}
     <table>
-        <tr><th scope="row">Monto mensual</th><td><strong>${{ '{:,.0f}'.format(billing.monto_mensual) }}</strong></td></tr>
+        <tr><th scope="row">Monto mensual</th><td><strong>${{ '{:,.0f}'.format(billing.monto_mensual).replace(',', '.') }}</strong></td></tr>
         <tr><th scope="row">Próximo vencimiento</th><td>{{ billing.proxima_fecha or '—' }}</td></tr>
         <tr><th scope="row">Auto-suspensión por mora</th><td>{{ 'Sí (a los %d días)'|format(billing.umbral_suspension) if billing.auto_suspender else 'No — excluido' }}</td></tr>
-        {% if billing.ultimo_pago %}<tr><th scope="row">Último pago</th><td>${{ '{:,.0f}'.format(billing.ultimo_pago.monto) }} el {{ billing.ultimo_pago.fecha }} ({{ billing.ultimo_pago.metodo or '—' }})</td></tr>{% endif %}
+        {% if billing.ultimo_pago %}<tr><th scope="row">Último pago</th><td>${{ '{:,.0f}'.format(billing.ultimo_pago.monto).replace(',', '.') }} el {{ billing.ultimo_pago.fecha }} ({{ billing.ultimo_pago.metodo or '—' }})</td></tr>{% endif %}
     </table>
 </article>
 
@@ -143,7 +143,7 @@
             {% for p in billing.historial %}
             <tr>
                 <td>{{ p.fecha }}</td>
-                <td>${{ '{:,.0f}'.format(p.monto) }}</td>
+                <td>${{ '{:,.0f}'.format(p.monto).replace(',', '.') }}</td>
                 <td>{{ p.metodo or '—' }}</td>
                 <td>{{ p.cubre_hasta or '—' }}</td>
                 <td>{{ p.nota or '' }}</td>

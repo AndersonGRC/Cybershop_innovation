@@ -32,7 +32,7 @@
         <tbody>
         {% for c in candidatas %}
             <tr>
-                <td><input type="checkbox" name="tenant_id" value="{{ c.tenant_id }}" class="marca"></td>
+                <td><input type="checkbox" name="tenant_id" value="{{ c.tenant_id }}" class="marca" aria-label="Marcar {{ c.nombre_negocio or c.slug }} para eliminar"></td>
                 <td><strong>{{ c.nombre_negocio or c.slug }}</strong><br><small><code>{{ c.slug }}</code></small></td>
                 <td><small>{{ c.buyer_nombre or '—' }}<br>{{ c.buyer_email }}{% if c.buyer_telefono %}<br>WhatsApp {{ c.buyer_telefono }}{% endif %}</small></td>
                 <td><small>{{ c.dominio or '—' }}</small></td>

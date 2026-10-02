@@ -15,8 +15,13 @@
     <nav class="admin-nav">
         <ul>
             <li><a href="{{ url_for('dashboard.index') }}" class="brand"><img src="{{ url_for('static', filename='logo.png') }}" alt="CyberShop" class="brand-logo"><strong>CyberShop Master</strong></a></li>
+            <li class="nav-toggle-li">
+                <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-menu">
+                    <span class="nav-toggle-icono" aria-hidden="true"></span>Menú
+                </button>
+            </li>
         </ul>
-        <ul>
+        <ul id="nav-menu" class="nav-menu">
             {% set _ep = request.endpoint or '' %}
             {% for ep, bp, texto in [('dashboard.index', 'dashboard.index', 'Panel'), ('tenants.lista', 'tenants.', 'Clientes'),
                                      ('flota.cobros', 'flota.cobros', 'Cobros'), ('flota.ia', 'flota.ia', 'IA'),
@@ -73,6 +78,68 @@
         // Preparado para cualquier POST futuro realizado mediante HTMX.
         document.body.addEventListener('htmx:configRequest', function (event) {
             event.detail.headers['X-CSRFToken'] = token;
+        });
+    })();
+
+    // ── Ajustes de presentación para celular (no tocan datos ni formularios) ──
+    (function () {
+        // Menú plegable.
+        var toggle = document.getElementById('nav-toggle');
+        var nav = document.querySelector('.admin-nav');
+        if (toggle && nav) {
+            toggle.addEventListener('click', function () {
+                var abierto = nav.classList.toggle('is-open');
+                toggle.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+            });
+        }
+
+        // Tablas con encabezado: cada celda lleva su rótulo para verse como
+        // tarjeta en pantallas angostas.
+        document.querySelectorAll('table').forEach(function (tabla) {
+            var ths = tabla.querySelectorAll('thead th');
+            if (!ths.length) { tabla.classList.add('tabla-clave-valor'); return; }
+            var rotulos = Array.prototype.map.call(ths, function (th) { return th.textContent.trim(); });
+            tabla.classList.add('tabla-tarjetas');
+            tabla.querySelectorAll('tbody tr').forEach(function (tr) {
+                Array.prototype.forEach.call(tr.children, function (celda, i) {
+                    if (rotulos[i] && !celda.hasAttribute('data-label')) celda.setAttribute('data-label', rotulos[i]);
+                });
+            });
+        });
+
+        // Zonas con desplazamiento: alcanzables con el teclado.
+        document.querySelectorAll('.table-wrap, figure, .tabbar').forEach(function (zona) {
+            if (zona.scrollWidth > zona.clientWidth + 1 && !zona.hasAttribute('tabindex')) {
+                zona.setAttribute('tabindex', '0');
+                if (!zona.hasAttribute('role') || zona.getAttribute('role') === 'tablist') {
+                    if (!zona.hasAttribute('role')) zona.setAttribute('role', 'region');
+                    if (!zona.hasAttribute('aria-label')) zona.setAttribute('aria-label', 'Contenido desplazable');
+                }
+            }
+        });
+
+        // Pestaña activa siempre visible en la barra.
+        function verPestana() {
+            var activa = document.querySelector('.tabbar .tab.is-active');
+            if (activa) activa.scrollIntoView({ block: 'nearest', inline: 'center' });
+        }
+        document.addEventListener('cs:tab', verPestana);
+        verPestana();
+
+        // Campos de solo lectura (credenciales, enlaces): botón Copiar.
+        document.querySelectorAll('input[readonly]').forEach(function (input) {
+            if (input.type === 'hidden' || input.nextElementSibling && input.nextElementSibling.classList.contains('btn-copiar')) return;
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn-copiar secondary outline';
+            b.textContent = 'Copiar';
+            b.setAttribute('aria-label', 'Copiar ' + ((input.labels && input.labels[0] && input.labels[0].textContent.trim()) || 'valor'));
+            b.addEventListener('click', function () {
+                var hecho = function () { b.textContent = 'Copiado ✓'; setTimeout(function () { b.textContent = 'Copiar'; }, 1800); };
+                if (navigator.clipboard) navigator.clipboard.writeText(input.value).then(hecho, function () { input.select(); document.execCommand('copy'); hecho(); });
+                else { input.select(); document.execCommand('copy'); hecho(); }
+            });
+            input.insertAdjacentElement('afterend', b);
         });
     })();
     </script>

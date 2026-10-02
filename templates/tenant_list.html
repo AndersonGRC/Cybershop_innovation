@@ -71,7 +71,7 @@
                     <small class="muted">sin sync</small>
                 {% endif %}
             </td>
-            <td><small>{{ t.created_at.strftime('%Y-%m-%d') }}</small></td>
+            <td class="nowrap"><small>{{ t.created_at.strftime('%Y-%m-%d') }}</small></td>
             <td>
                 <a href="{{ url_for('tenants.detail', tenant_id=t.id) }}"
                    role="button" class="secondary outline btn-small" aria-label="Abrir la ficha de {{ t.nombre }}">Abrir ficha</a>
