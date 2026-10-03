@@ -29,6 +29,7 @@ MODULES = [
     ('video', 'Videollamadas', 'Salas de videollamadas con Jitsi.', 'clientes', 'video_habilitado', True),
     ('share', 'Compartir Archivos', 'Carpetas y archivos compartidos por link.', 'clientes', 'share_habilitado', True),
     ('restaurant_tables', 'Mesas Restaurante', 'Plano de mesas, cuenta abierta y consumos.', 'operacion', 'restaurant_tables_habilitado', True),
+    ('servicio_tecnico', 'Servicio Técnico', 'Equipos de los clientes (computadores, celulares, tablets, televisores, UPS…), órdenes de servicio de la recepción a la entrega, garantía y seguimiento. Apagado por defecto.', 'operacion', 'servicio_tecnico_habilitado', False),
     ('facturacion_electronica', 'Facturación DIAN', 'Facturación electrónica integrada con DIAN.', 'finanzas', 'facturacion_electronica', False),
     ('ai_assistant', 'Asistente IA', 'IA para descripciones, SEO y auto-respuestas. Cada cliente con su propio agente aislado a su BD.', 'inteligencia', 'ia_habilitado', False),
     ('ai_actions', 'Acciones operativas con IA', 'Permite preparar desde el panel IA cambios de productos, categorias, inventario (entradas, salidas y ajustes), contactos (crear, editar, archivar, reactivar), CRM (tareas, actividades y oportunidades), reseñas (aprobar, responder) y tickets de soporte (cerrar, reabrir). Cada cambio exige confirmación humana y se registra en la BD del cliente. Apagado por defecto.', 'inteligencia', 'ia_acciones_habilitadas', False),
@@ -47,7 +48,8 @@ PLAN_MODULES = {
     'basico':   {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'bulk_upload'},
     'estandar': {'pos', 'caja', 'inventory', 'orders', 'content', 'users', 'quotes',
                  'billing', 'coupons', 'wishlist', 'crm', 'support', 'bulk_upload'},
-    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public', 'ai_actions', 'ai_public_compat'},
+    'ultra':    set(ALL_CODES) - {'facturacion_electronica', 'ai_public', 'ai_actions', 'ai_public_compat',
+                                  'servicio_tecnico'},
 }
 PLANS = list(PLAN_MODULES.keys())
 
