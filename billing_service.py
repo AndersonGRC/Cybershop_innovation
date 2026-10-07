@@ -46,6 +46,53 @@ def _today() -> datetime.date:
     return datetime.date.today()
 
 
+# ── Fecha de corte: el día de pago del cliente NO cambia ───────
+# Si vence el 18 y paga el 7 del mes siguiente, el pago cubre su mes (del 18 al
+# 18) y el próximo vence otra vez el 18. Antes, un pago tarde contaba el mes
+# desde el día del pago y el día de cobro se corría cada vez.
+def _con_dia(anio: int, mes: int, dia: int) -> datetime.date:
+    """El día de corte en ese mes (el 31 en febrero es el 28 o 29)."""
+    return datetime.date(anio, mes, min(int(dia), calendar.monthrange(anio, mes)[1]))
+
+
+def _sumar_ciclos(d: datetime.date, meses: int, dia: int) -> datetime.date:
+    """La fecha de corte `meses` meses después (o antes, si es negativo)."""
+    m = d.month - 1 + meses
+    return _con_dia(d.year + m // 12, m % 12 + 1, dia)
+
+
+def corte_del_ciclo(proxima: datetime.date, dia: int) -> datetime.date:
+    """Fecha de corte del ciclo que vence en `proxima`: el día de corte de ese
+    mes si ya llegó, o el del mes anterior. Así una prórroga («Dar más plazo»)
+    no corre el día de pago: el pago sigue cubriendo el mes desde el corte."""
+    corte = _con_dia(proxima.year, proxima.month, dia)
+    if corte > proxima:
+        corte = _sumar_ciclos(corte, -1, dia)
+    return corte
+
+
+def proximo_vencimiento(proxima, dia_corte, fecha_pago, meses=1):
+    """(nuevo vencimiento, día de corte) después de un pago de `meses` meses.
+
+    Con vencimiento vigente, cuenta desde la fecha de corte del ciclo, pague
+    tarde, a tiempo o por adelantado. Sin vencimiento (primer pago) el período
+    arranca el día del pago y ese pasa a ser el día de corte."""
+    if proxima:
+        dia = int(dia_corte or proxima.day)
+        return _sumar_ciclos(corte_del_ciclo(proxima, dia), meses, dia), dia
+    return _sumar_ciclos(fecha_pago, meses, fecha_pago.day), fecha_pago.day
+
+
+def _parse_meses(v) -> int:
+    try:
+        meses = int(str(v).strip()) if v not in (None, '') else 1
+    except ValueError:
+        raise ValueError("Meses inválidos")
+    if not 1 <= meses <= 12:
+        raise ValueError("Un pago cubre de 1 a 12 meses")
+    return meses
+
+
 def _parse_date(v):
     if not v:
         return None
@@ -80,6 +127,10 @@ def _ensure_tables():
         # el plan esté al día). Junto con avisos_off define el modo del aviso.
         cur.execute("ALTER TABLE tenant_billing "
                     "ADD COLUMN IF NOT EXISTS aviso_forzar BOOLEAN NOT NULL DEFAULT FALSE")
+        # Aditivo: día del mes en que vence el cliente (su fecha de corte). NULL =
+        # el día de proxima_fecha. Lo fija el operador al corregir el vencimiento.
+        cur.execute("ALTER TABLE tenant_billing "
+                    "ADD COLUMN IF NOT EXISTS dia_corte SMALLINT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tenant_pagos (
                 id SERIAL PRIMARY KEY,
@@ -122,6 +173,7 @@ def get_billing(tenant_id: int) -> dict:
     aviso_forzar = bool(row.get('aviso_forzar')) if row else False
     aviso_modo = 'silenciar' if avisos_off else ('forzar' if aviso_forzar else 'auto')
     dias_susp = row.get('dias_suspension') if row else None
+    dia_corte = (row.get('dia_corte') if row else None) or (proxima.day if proxima else None)
     estado, dias = _estado(proxima)
     motor = get_motor_info(tenant_id)
     # Umbral efectivo: si el operador fijó días por cliente, mandan; si no, 30 para
@@ -132,6 +184,7 @@ def get_billing(tenant_id: int) -> dict:
         'configurado': bool(row),
         'monto_mensual': monto,
         'proxima_fecha': proxima,
+        'dia_corte': dia_corte,
         'auto_suspender': auto,
         'avisos_off': avisos_off,
         'aviso_forzar': aviso_forzar,
@@ -214,20 +267,34 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
         except ValueError:
             monto = None
     pf = _parse_date(proxima_fecha) if proxima_fecha is not None else None
+    corregida = False
     with control_plane_cursor() as cur:
-        cur.execute("SELECT 1 FROM tenant_billing WHERE tenant_id = %s", (tenant_id,))
-        existe = cur.fetchone() is not None
+        cur.execute("SELECT proxima_fecha FROM tenant_billing WHERE tenant_id = %s", (tenant_id,))
+        fila = cur.fetchone()
+        existe = fila is not None
         if not existe:
             cur.execute(
-                "INSERT INTO tenant_billing (tenant_id, monto_mensual, proxima_fecha, auto_suspender, notas, dias_suspension) "
-                "VALUES (%s, COALESCE(%s,0), %s, COALESCE(%s,TRUE), %s, %s)",
-                (tenant_id, monto, pf, auto_suspender, notas, _parse_dias(dias_suspension)))
-            return
+                "INSERT INTO tenant_billing (tenant_id, monto_mensual, proxima_fecha, auto_suspender, notas, "
+                "dias_suspension, dia_corte) "
+                "VALUES (%s, COALESCE(%s,0), %s, COALESCE(%s,TRUE), %s, %s, %s)",
+                (tenant_id, monto, pf, auto_suspender, notas, _parse_dias(dias_suspension),
+                 pf.day if pf else None))
+            corregida = pf is not None
+        else:
+            corregida = proxima_fecha is not None and pf != fila[0]
+    if not existe:
+        if corregida:
+            _sincronizar_motor(tenant_id, pf, forzar=True)
+        return
+    with control_plane_cursor() as cur:
         sets, params = [], []
         if monto is not None:
             sets.append("monto_mensual = %s"); params.append(monto)
         if proxima_fecha is not None:
             sets.append("proxima_fecha = %s"); params.append(pf)
+        if corregida:
+            # El operador corrigió el vencimiento: ese día pasa a ser su día de pago.
+            sets.append("dia_corte = %s"); params.append(pf.day if pf else None)
         if auto_suspender is not None:
             sets.append("auto_suspender = %s"); params.append(bool(auto_suspender))
         if notas is not None:
@@ -241,6 +308,11 @@ def set_config(tenant_id, monto_mensual=None, proxima_fecha=None, auto_suspender
         sets.append("updated_at = NOW()")
         params.append(tenant_id)
         cur.execute(f"UPDATE tenant_billing SET {', '.join(sets)} WHERE tenant_id = %s", params)
+    if corregida and pf:
+        audit_service.registrar('vencimiento_corregido', tenant_id, actor='fADMIN',
+                                detalle=f"proxima_fecha={pf} dia_corte={pf.day}")
+        # Corrección explícita: el motor (recordatorios) toma la misma fecha.
+        _sincronizar_motor(tenant_id, pf, forzar=True)
 
 
 def set_aviso_modo(tenant_id: int, modo: str) -> str:
@@ -300,14 +372,14 @@ def sync_billing_to_tenant(tenant_id: int) -> bool:
         return False
 
 
-def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registrado_por=None):
-    """Registra un pago y avanza el próximo vencimiento +1 mes.
-
-    Base del avance: el vencimiento vigente si aún no venció (prepago), o la fecha
-    del pago si ya estaba en mora / sin fecha.
-    """
+def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registrado_por=None, meses=1):
+    """Registra un pago de `meses` meses y corre el vencimiento DESDE SU FECHA DE
+    CORTE: el día de pago del cliente no cambia aunque pague tarde o antes
+    (ver `proximo_vencimiento`). Si el pago no alcanza a cubrir hasta hoy, el
+    cliente sigue en mora (debe más meses). Devuelve el nuevo vencimiento."""
     _ensure_tables()
     fecha = _parse_date(fecha) or _today()
+    meses = _parse_meses(meses)
     try:
         monto_f = float(str(monto).replace(',', '').replace('$', '').strip())
     except (TypeError, ValueError):
@@ -315,7 +387,7 @@ def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registr
 
     with control_plane_cursor(dict_cursor=True) as cur:
         cur.execute(
-            "SELECT b.proxima_fecha, t.estado "
+            "SELECT b.proxima_fecha, b.dia_corte, t.estado "
             "FROM tenants t LEFT JOIN tenant_billing b ON b.tenant_id = t.id "
             "WHERE t.id = %s", (tenant_id,))
         row = cur.fetchone()
@@ -323,19 +395,18 @@ def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registr
         estado_actual = row['estado'] if row else None
         tiene_billing = bool(row and proxima is not None) or _billing_existe(cur, tenant_id)
 
-        base = proxima if (proxima and proxima > fecha) else fecha
-        nueva = _add_months(base, 1)
+        nueva, dia = proximo_vencimiento(proxima, row['dia_corte'] if row else None, fecha, meses)
 
         cur.execute(
             "INSERT INTO tenant_pagos (tenant_id, monto, fecha, metodo, nota, cubre_hasta, registrado_por) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (tenant_id, monto_f, fecha, metodo, nota, nueva, registrado_por))
         if tiene_billing:
-            cur.execute("UPDATE tenant_billing SET proxima_fecha = %s, updated_at = NOW() WHERE tenant_id = %s",
-                        (nueva, tenant_id))
+            cur.execute("UPDATE tenant_billing SET proxima_fecha = %s, dia_corte = COALESCE(dia_corte, %s), "
+                        "updated_at = NOW() WHERE tenant_id = %s", (nueva, dia, tenant_id))
         else:
-            cur.execute("INSERT INTO tenant_billing (tenant_id, proxima_fecha) VALUES (%s,%s)",
-                        (tenant_id, nueva))
+            cur.execute("INSERT INTO tenant_billing (tenant_id, proxima_fecha, dia_corte) VALUES (%s,%s,%s)",
+                        (tenant_id, nueva, dia))
 
     # Si estaba suspendido y el pago lo deja al día, reactivar el cliente.
     if estado_actual == 'suspendido' and nueva >= _today():
@@ -345,7 +416,9 @@ def registrar_pago(tenant_id, monto, fecha=None, metodo=None, nota=None, registr
         except Exception:  # noqa: BLE001
             pass
     audit_service.registrar('pago', tenant_id, actor=(registrado_por or 'fADMIN'),
-                            detalle=f"monto={monto_f} cubre_hasta={nueva}")
+                            detalle=f"monto={monto_f} meses={meses} cubre_hasta={nueva} dia_corte={dia}")
+    # Los recordatorios del motor usan la misma fecha desde ya (no esperan al cron).
+    _sincronizar_motor(tenant_id, nueva, pago=True)
     return nueva
 
 
@@ -376,6 +449,8 @@ def extender_plazo(tenant_id, dias=None, nueva_fecha=None):
         else:
             cur.execute("INSERT INTO tenant_billing (tenant_id, proxima_fecha) VALUES (%s,%s)",
                         (tenant_id, destino))
+    # Prórroga: el día de pago (dia_corte) no cambia; el motor no avisa antes de tiempo.
+    _sincronizar_motor(tenant_id, destino)
     return destino
 
 
@@ -462,6 +537,28 @@ def _motor_ejecutar(sql_texto, params, devolver=False):
         return resultado
     finally:
         conn.close()
+
+
+def _sincronizar_motor(tenant_id: int, fecha, forzar: bool = False, pago: bool = False) -> int:
+    """Lleva el vencimiento del maestro al motor de cobro (plan_compras), que es
+    el que manda los recordatorios. Por defecto solo lo ADELANTA (un pago en
+    línea pudo dejar el motor más adelante); con `forzar` (el operador corrigió
+    la fecha a mano) lo deja igual al del maestro. Reinicia los recordatorios
+    del ciclo. Nunca rompe la operación del maestro: devuelve las filas tocadas."""
+    if not fecha:
+        return 0
+    try:
+        sql = ("UPDATE plan_compras SET proximo_pago = %s, ultimo_recordatorio = NULL, "
+               "suspendida_por_pago = CASE WHEN %s >= CURRENT_DATE THEN FALSE ELSE suspendida_por_pago END"
+               + (", es_trial = FALSE" if pago else "")
+               + " WHERE tenant_id = %s AND estado = 'ACTIVADA' AND renovacion_de IS NULL")
+        params = [fecha, fecha, tenant_id]
+        if not forzar:
+            sql += " AND (proximo_pago IS NULL OR proximo_pago < %s)"
+            params.append(fecha)
+        return _motor_ejecutar(sql, tuple(params))
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 def cerrar_compra_motor(tenant_id: int, estado: str) -> int:

@@ -440,8 +440,14 @@ def billing_pago(tenant_id):
             metodo=request.form.get('metodo'),
             nota=request.form.get('nota'),
             registrado_por=_por(),
+            meses=request.form.get('meses') or 1,
         )
-        flash(f'Pago registrado. Próximo vencimiento: {nueva}.', 'success')
+        flash(f'Pago registrado. Próximo vencimiento: {nueva} (su día de pago sigue siendo el {nueva.day}).',
+              'success')
+        if nueva < billing_service._today():
+            atraso = (billing_service._today() - nueva).days
+            flash(f'Ojo: aun con este pago sigue vencido desde el {nueva} ({atraso} días). Si pagó más meses, '
+                  'regístralos en «Meses que cubre»; si es un acuerdo, usa «Dar más plazo».', 'warning')
     except Exception as exc:  # noqa: BLE001
         flash(f'Error registrando pago: {exc}', 'error')
     billing_service.sync_billing_to_tenant(tenant_id)

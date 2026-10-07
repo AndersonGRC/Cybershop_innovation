@@ -18,6 +18,7 @@
     <table>
         <tr><th scope="row">Monto mensual</th><td><strong>${{ '{:,.0f}'.format(billing.monto_mensual).replace(',', '.') }}</strong></td></tr>
         <tr><th scope="row">Próximo vencimiento</th><td>{{ billing.proxima_fecha or '—' }}</td></tr>
+        {% if billing.dia_corte %}<tr><th scope="row">Día de pago</th><td>El {{ billing.dia_corte }} de cada mes <small class="muted">(no cambia aunque pague tarde)</small></td></tr>{% endif %}
         <tr><th scope="row">Auto-suspensión por mora</th><td>{{ 'Sí (a los %d días)'|format(billing.umbral_suspension) if billing.auto_suspender else 'No — excluido' }}</td></tr>
         {% if billing.ultimo_pago %}<tr><th scope="row">Último pago</th><td>${{ '{:,.0f}'.format(billing.ultimo_pago.monto).replace(',', '.') }} el {{ billing.ultimo_pago.fecha }} ({{ billing.ultimo_pago.metodo or '—' }})</td></tr>{% endif %}
     </table>
@@ -37,9 +38,15 @@
                     <option value="otro">Otro</option>
                 </select>
             </label>
+            <label>Meses que cubre
+                <select name="meses">
+                    {% for m in range(1, 13) %}<option value="{{ m }}">{{ m }} {{ 'mes' if m == 1 else 'meses' }}</option>{% endfor %}
+                </select>
+            </label>
             <label>Nota <input type="text" name="nota" placeholder="opcional"></label>
-            <button type="submit">Registrar pago (+1 mes)</button>
-            <small class="muted">Avanza el vencimiento un mes y reactiva si estaba suspendido por mora.</small>
+            <button type="submit">Registrar pago</button>
+            <small class="muted">Corre el vencimiento desde su fecha de corte: el día de pago no cambia aunque pague
+                tarde o antes. Reactiva si estaba suspendido y queda al día.</small>
         </form>
     </article>
 
@@ -79,7 +86,7 @@
             <td><input type="text" readonly value="{{ billing.motor.link_pago }}" class="input-copiar" onclick="this.select()" aria-label="Link de pago"></td></tr>
         {% endif %}
     </table>
-    <p class="muted">Si registras un pago manual aquí, el motor adopta la nueva fecha en la próxima corrida diaria.</p>
+    <p class="muted">Si registras un pago o corriges el vencimiento aquí, el motor toma la misma fecha de una vez y reinicia sus recordatorios.</p>
     {% else %}
     <p><span class="badge badge-muted">Fuera del motor</span> Este cliente no recibe recordatorios automáticos ni
        tiene link de pago. Córrelo con <code>tools/backfill_plan_compras.py</code> en el servidor para incorporarlo.</p>
@@ -113,7 +120,8 @@
     <form method="post" action="{{ url_for('tenants.billing_config', tenant_id=tenant.id) }}">
         <div class="grid-2">
             <label>Monto mensual <input type="text" name="monto_mensual" value="{{ '%.0f'|format(billing.monto_mensual) if billing.monto_mensual else '' }}" inputmode="numeric"></label>
-            <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}"></label>
+            <label>Próximo vencimiento <input type="date" name="proxima_fecha" value="{{ billing.proxima_fecha or '' }}">
+                <small class="muted">Si lo corriges, ese día pasa a ser su día de pago.</small></label>
         </div>
         <div class="grid-2">
             <label>Días de plazo antes de suspender

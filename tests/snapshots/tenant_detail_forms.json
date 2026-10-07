@@ -513,6 +513,7 @@
    "action": "/tenants/7/billing/pago",
    "editables": [
     "fecha",
+    "meses",
     "metodo",
     "monto",
     "nota"
@@ -863,6 +864,7 @@
    "action": "/tenants/7/billing/pago",
    "editables": [
     "fecha",
+    "meses",
     "metodo",
     "monto",
     "nota"
