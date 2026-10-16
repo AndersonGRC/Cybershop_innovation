@@ -15,9 +15,37 @@ import billing_service
 import audit_service
 import timezone_service as tzs
 from tenant_service import TenantCreationError
+from tenant_site_fields import SITE_FIELDS
 
 
 bp = Blueprint('tenants', __name__, url_prefix='/tenants')
+
+
+def _numero_whatsapp(valor):
+    """WhatsApp como lo pide wa.me: solo dígitos y con el 57 si es colombiano de 10.
+    '' si no sirve (igual que la regla de las tiendas: public_site_service.numero_whatsapp)."""
+    digitos = ''.join(ch for ch in str(valor or '') if ch.isdigit())
+    if len(digitos) == 10:
+        digitos = '57' + digitos
+    return digitos if 11 <= len(digitos) <= 15 else ''
+
+
+# El WhatsApp y el celular de CyberShop (valores por defecto de los campos): la tienda
+# de un cliente no los muestra, así que no sirven como el WhatsApp de un cliente nuevo.
+_NUMEROS_DE_CYBERSHOP = {_numero_whatsapp(f['default']) for f in SITE_FIELDS
+                         if f['key'] in ('empresa_whatsapp', 'empresa_telefono')} - {''}
+
+
+def _whatsapp_cliente_nuevo(valor):
+    """(número para la tienda, None) o (None, mensaje). Toda tienda nueva sale con SU
+    WhatsApp: es el botón «Chatea con nosotros» de su página."""
+    numero = _numero_whatsapp(valor)
+    if not numero:
+        return None, ('Escribe el WhatsApp del negocio: 10 dígitos (ej. 300 123 4567) o con el '
+                      'indicativo de su país. Es el botón «Chatea con nosotros» de su página.')
+    if numero in _NUMEROS_DE_CYBERSHOP:
+        return None, 'Ese es el WhatsApp de CyberShop: escribe el del negocio del cliente.'
+    return numero, None
 
 # Catálogo de plantillas de estilo del sitio público (lo elige el ADMIN por cliente).
 # Nota: las plantillas alternativas se ven solo en clientes con el diseño instalado
@@ -60,6 +88,14 @@ def nuevo():
                 'admin_nombre': admin_nombre, 'plan': plan,
                 'empresa_telefono': telefono, 'empresa_whatsapp': whatsapp,
                 'timezone': timezone}
+        # Antes de crear nada: sin WhatsApp propio, su página no tendría botón de chat.
+        whatsapp, wa_error = _whatsapp_cliente_nuevo(whatsapp)
+        if wa_error:
+            flash(wa_error, 'error')
+            return render_template('tenant_new.html', form=form, plans=ms.PLANS,
+                                   timezones=tzs.TIMEZONES)
+        if not telefono.strip():
+            telefono = whatsapp[2:] if whatsapp.startswith('57') and len(whatsapp) == 12 else whatsapp
         try:
             result = tenant_service.create_tenant(
                 slug=slug, nombre=nombre, admin_email=admin_email,

@@ -84,10 +84,12 @@
                        placeholder="ej. (601) 123 4567">
             </label>
             <label for="empresa_whatsapp">
-                WhatsApp <span style="font-weight:normal">(opcional)</span>
-                <input type="text" id="empresa_whatsapp" name="empresa_whatsapp"
-                       value="{{ form.empresa_whatsapp }}" maxlength="40"
-                       placeholder="ej. 573001234567">
+                WhatsApp del negocio
+                <input type="tel" id="empresa_whatsapp" name="empresa_whatsapp" required
+                       value="{{ form.empresa_whatsapp }}" maxlength="40" inputmode="tel"
+                       placeholder="ej. 300 123 4567" aria-describedby="ayuda-whatsapp">
+                <small id="ayuda-whatsapp">Es el botón «Chatea con nosotros» de su página. Si dejas el
+                    teléfono vacío, se usa este mismo número.</small>
             </label>
         </div>
 
