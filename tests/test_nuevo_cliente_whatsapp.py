@@ -29,6 +29,8 @@ def nuevo_env(monkeypatch):
                         lambda **kw: creados.append(kw) or {'tenant_id': 41, 'warnings': []})
     monkeypatch.setattr(tenant_routes.ccs, 'set_values',
                         lambda tenant_id, valores: contacto.append((tenant_id, valores)))
+    # Sin red: el correo de bienvenida queda anotado (tests/test_bienvenida.py lo prueba).
+    monkeypatch.setattr(tenant_routes.bienvenida, 'enviar', lambda result, admin_nombre='': (True, ''))
 
     def enviar(**campos):
         with app.test_request_context('/tenants/nuevo', method='POST', data={**BASE, **campos}):
@@ -62,3 +64,24 @@ def test_conserva_su_telefono_fijo(nuevo_env):
     enviar, _, contacto = nuevo_env
     enviar(empresa_whatsapp='3104445566', empresa_telefono='(601) 234 5678')
     assert contacto == [(41, {'empresa_telefono': '(601) 234 5678', 'empresa_whatsapp': '573104445566'})]
+
+
+def test_al_crear_se_envia_la_bienvenida(nuevo_env, monkeypatch):
+    from routes import tenant_routes
+    pedidos = []
+    monkeypatch.setattr(tenant_routes.bienvenida, 'enviar',
+                        lambda result, admin_nombre='': pedidos.append((result, admin_nombre)) or (True, ''))
+    enviar, creados, _ = nuevo_env
+    _, mensajes = enviar(empresa_whatsapp='3001234567')
+    assert len(creados) == 1 and pedidos[0][1] == 'Dueña' and pedidos[0][0]['tenant_id'] == 41
+    assert any('correo de bienvenida' in m for m in mensajes)
+
+
+def test_si_la_bienvenida_falla_la_tienda_queda_y_se_avisa(nuevo_env, monkeypatch):
+    from routes import tenant_routes
+    monkeypatch.setattr(tenant_routes.bienvenida, 'enviar',
+                        lambda result, admin_nombre='': (False, 'el sitio principal respondió 502'))
+    enviar, creados, _ = nuevo_env
+    respuesta, mensajes = enviar(empresa_whatsapp='3001234567')
+    assert respuesta.status_code == 302 and len(creados) == 1
+    assert any('No se pudo enviar el correo de bienvenida' in m and '502' in m for m in mensajes)

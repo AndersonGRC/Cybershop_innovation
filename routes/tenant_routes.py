@@ -12,6 +12,7 @@ import client_config_service as ccs
 import module_service as ms
 import integrations_service as ints
 import billing_service
+import bienvenida_service as bienvenida
 import audit_service
 import timezone_service as tzs
 from tenant_service import TenantCreationError
@@ -118,6 +119,17 @@ def nuevo():
         # Avisos no críticos del aprovisionamiento (módulos/instancia pendientes).
         for w in (result.get('warnings') or []):
             flash(f'Aviso: {w}', 'warning')
+
+        # Correo de bienvenida al dueño con sus datos de acceso (lo envía el sitio de
+        # CyberShop). Si falla, la tienda ya existe: se avisa para entregarlos a mano.
+        enviado, motivo = bienvenida.enviar(result, admin_nombre=admin_nombre)
+        result['bienvenida_enviada'] = enviado
+        if enviado:
+            flash(f"Le enviamos a {result.get('admin_email')} el correo de bienvenida con su "
+                  'usuario y contraseña temporal.', 'success')
+        else:
+            flash(f'No se pudo enviar el correo de bienvenida ({motivo}). Entrégale tú los datos '
+                  'de acceso que ves abajo.', 'warning')
 
         # Stash credenciales en sesión flash (UNA SOLA VEZ)
         session['_created_tenant'] = result
