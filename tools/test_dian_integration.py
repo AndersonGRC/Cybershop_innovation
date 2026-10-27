@@ -68,7 +68,7 @@ Config.DIAN_UI_URL = f'http://127.0.0.1:{port}/ui'
 import dian_service as ds
 import integrations_service as ints
 
-SLUG = '_test_dian_integration'
+SLUG = 'test-dian-integration'  # válido para env_path (minúsculas y guiones)
 fallas = []
 
 
@@ -92,17 +92,19 @@ check('provision retorna tenant id', r['tenant_dian_id'] == 'uuid-mock-1')
 check('NIT normalizado (sin puntos)', r['nit'] == '900373913')
 check('env: DIAN_API_KEY escrita', env.get('DIAN_API_KEY') == TENANT_KEY)
 check('env: DIAN_SERVICE_URL escrita', env.get('DIAN_SERVICE_URL') == Config.DIAN_SERVICE_URL)
-check('env: DIAN_MASTER_KEY escrita', env.get('DIAN_MASTER_KEY') == MASTER)
+check('env: SIN DIAN_MASTER_KEY (no se reparte la llave maestra)', 'DIAN_MASTER_KEY' not in env)
 check('env: DIAN_UI_URL escrita', env.get('DIAN_UI_URL') == Config.DIAN_UI_URL)
 
 # 4. Preserva claves existentes del env
 ints.set_env_values(SLUG, {'PAYU_MERCHANT_ID': '12345'})
-ds.provision(SLUG + '_b', nombre='Otro', nit='830053812', razon_social='Otro SAS')
+ds.provision(SLUG + '-b', nombre='Otro', nit='830053812', razon_social='Otro SAS')
 check('set_env_values preserva claves', ints.read_env(SLUG).get('PAYU_MERCHANT_ID') == '12345')
 
-# 5. Validate: toda la cadena OK
+# 5. Validate: toda la cadena OK. La parte tributaria necesita el NIT del cliente
+# (BILLING_ID) y el detalle del tenant, que este mock no simula: se excluye.
 checks = ds.validate(SLUG)
-check('validate: todas las comprobaciones pasan', all(ok for ok, _ in checks))
+check('validate: todas las comprobaciones de conexión pasan',
+      all(ok for ok, msg in checks if not msg.startswith('Validación tributaria NO verificada')))
 
 # 6. API key inválida detectada
 ints.set_env_values(SLUG, {'DIAN_API_KEY': 'b' * 64})
@@ -121,7 +123,7 @@ t = ds.buscar_tenant_por_nit('900373913')
 check('buscar_tenant_por_nit encuentra el tenant', t is not None and t['nit'] == '900373913')
 
 # Limpieza de envs de prueba
-for s in (SLUG, SLUG + '_b'):
+for s in (SLUG, SLUG + '-b'):
     p = ints.env_path(s)
     if p.exists():
         p.unlink()

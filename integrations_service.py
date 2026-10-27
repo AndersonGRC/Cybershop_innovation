@@ -130,7 +130,10 @@ GROUPS = [
     ('Facturación Electrónica (microservicio DIAN)', [
         ('DIAN_SERVICE_URL', 'URL del servicio (con /api/v1)', False, 'text', None),
         ('DIAN_API_KEY', 'API Key del tenant DIAN', True, 'text', None),
-        ('DIAN_MASTER_KEY', 'Master Key (SSO panel DIAN)', True, 'text', None),
+        # DIAN_MASTER_KEY ya no va en la instancia del cliente: el acceso al portal
+        # lo da el propio portal con la API key del tenant (/api/v1/portal/token).
+        # Con la maestra, el admin de cualquier cliente entraba como administrador
+        # general del portal y veía a todos los demás.
         ('DIAN_UI_URL', 'URL pública del panel DIAN', False, 'text', None),
     ]),
     ('Asistente IA (Ollama / OpenAI-compatible)', [

@@ -6,8 +6,10 @@ Cadena completa para que "todo hable con todo":
      en la app del cliente.
   2. Este servicio provisiona el tenant en FacturacionDIAN
      (POST /api/v1/admin/tenants con X-Master-Key) y escribe las credenciales
-     en el EnvironmentFile de la instancia: DIAN_SERVICE_URL, DIAN_API_KEY,
-     DIAN_MASTER_KEY (SSO HMAC del panel DIAN) y DIAN_UI_URL.
+     en el EnvironmentFile de la instancia: DIAN_SERVICE_URL, DIAN_API_KEY y
+     DIAN_UI_URL. La DIAN_MASTER_KEY se queda SOLO en el maestro: el acceso del
+     cliente a su portal lo genera el propio portal con su API key
+     (/api/v1/portal/token), limitado a sus documentos.
   3. La instancia del cliente se reinicia para tomar el env →
      routes/factura_electronica.py de la app ya puede emitir.
 
@@ -21,7 +23,7 @@ import urllib.request
 from config import Config
 import integrations_service as ints
 
-ENV_KEYS = ('DIAN_SERVICE_URL', 'DIAN_API_KEY', 'DIAN_MASTER_KEY', 'DIAN_UI_URL')
+ENV_KEYS = ('DIAN_SERVICE_URL', 'DIAN_API_KEY', 'DIAN_UI_URL')
 _UUID_CERO = '00000000-0000-0000-0000-000000000000'
 AMBIENTES = ('habilitacion', 'produccion')
 
@@ -216,8 +218,13 @@ def validate(slug: str, nit: str = None) -> list:
     alive = service_alive()
     checks.append((alive, f"Servicio DIAN alcanzable ({_root()}/health)"))
     env = ints.read_env(slug)
-    for key in ('DIAN_SERVICE_URL', 'DIAN_API_KEY', 'DIAN_MASTER_KEY'):
+    for key in ('DIAN_SERVICE_URL', 'DIAN_API_KEY'):
         checks.append((bool(env.get(key)), f"{key} presente en el env de la instancia"))
+    # La maestra en el env del cliente ya no se usa y abría el portal como
+    # administrador general: se avisa para retirarla (no se borra sola).
+    checks.append((not env.get('DIAN_MASTER_KEY'),
+                   'Sin DIAN_MASTER_KEY en el env de la instancia' if not env.get('DIAN_MASTER_KEY')
+                   else 'La instancia aún guarda DIAN_MASTER_KEY: ya no se usa; retírala de su env'))
     if alive and env.get('DIAN_API_KEY'):
         # Una factura inexistente con API key válida da 404; key inválida da 403.
         status, _ = _request(
@@ -299,7 +306,6 @@ def provision(slug: str, nombre: str, nit: str, razon_social: str,
     valores = {
         'DIAN_SERVICE_URL': _api(),
         'DIAN_API_KEY': body['api_key'],
-        'DIAN_MASTER_KEY': Config.DIAN_MASTER_KEY,
     }
     if Config.DIAN_UI_URL:
         valores['DIAN_UI_URL'] = Config.DIAN_UI_URL
